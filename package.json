@@ -1,0 +1,29 @@
+{
+  "name": "fincosts",
+  "version": "1.0.0",
+  "description": "A CLI tool to optimize cloud costs by identifying unused resources and providing cost-saving recommendations for popular cloud providers.",
+  "type": "module",
+  "repository": "B3llo/fincosts",
+  "author": "Gabriel F. Bello",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc && pkgroll --entry dist/index.js --output dist/fincosts"
+  },
+  "bin": {
+    "fincosts": "./dist/index.js"
+  },
+  "dependencies": {
+    "chalk": "^5.2.0",
+    "cleye": "^1.3.2",
+    "execa": "^7.0.0",
+    "inquirer": "^9.1.4",
+    "node-emoji": "^1.11.0"
+  },
+  "main": "./dist/index.cjs",
+  "devDependencies": {
+    "@types/inquirer": "^9.0.3",
+    "@types/node-emoji": "^1.8.2",
+    "pkgroll": "^1.9.0",
+    "typescript": "^4.9.5"
+  }
+}
