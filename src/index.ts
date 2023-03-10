@@ -1,14 +1,15 @@
+import { getDefaultRegion, listAvailableProfiles, readFincostsConfig, setAWSCredentials, setAWSRegion } from "./utils/aws/credentials";
 import { AvailableProviders } from "./enums/availableProviders.enum";
+import { fetchAllInstances } from "./utils/aws/analysis";
 import inquirer from "inquirer";
 import chalk from "chalk";
-import { getCredentials } from "./utils/credentials";
 
 export async function getProvider(): Promise<string> {
   const answer = await inquirer.prompt([
     {
       type: "list",
       name: "cloudProvider",
-      message: "Which cloud provider do you want to analyze?",
+      message: "\nWhich cloud provider do you want to analyze?",
       choices: ["AWS", "GCP", "Azure"],
     },
   ]);
@@ -17,19 +18,33 @@ export async function getProvider(): Promise<string> {
 }
 
 export async function getCredentialProfile(): Promise<string> {
-  const credentials = await getCredentials();
-  const choices = Object.keys(credentials);
+  const credentials = await listAvailableProfiles();
+  const choices = Object.keys(credentials.credentialsFile);
 
   const answer = await inquirer.prompt([
     {
       type: "list",
       name: "credentialProfile",
-      message: "Which AWS credential profile do you want to use?",
+      message: "\nWhich AWS credential profile do you want to use?",
       choices: choices,
     },
   ]);
 
   return answer.credentialProfile;
+}
+
+export async function getRegion() {
+  const defaultRegion = readFincostsConfig().defaultRegion;
+  const answer = await inquirer.prompt([
+    {
+      type: "input",
+      name: "region",
+      message: `\nWhich region do you want to use? (${defaultRegion})`,
+      default: defaultRegion,
+    },
+  ]);
+
+  setAWSRegion(answer.region);
 }
 
 (async () => {
@@ -40,15 +55,22 @@ export async function getCredentialProfile(): Promise<string> {
     return;
   }
 
-  console.log("\n👉  You selected", chalk.green(provider) + "\n");
+  console.log("👉  You selected", chalk.green(provider));
 
-  if (provider === "AWS") {
-    const credentialProfile = await getCredentialProfile();
-    console.log("\n👉  Using AWS credential profile", chalk.green(credentialProfile));
-  }
+  const credentialProfile = await getCredentialProfile();
+  console.log("👉  Using AWS credential profile", chalk.green(credentialProfile));
+
+  setAWSCredentials(credentialProfile);
+
+  getDefaultRegion(credentialProfile);
+  await getRegion();
+
+  await fetchAllInstances().then((instances) => {
+    console.log("\n👉  Found", chalk.green(instances.length), "instances");
+  });
 
   console.log("\n🧪", chalk.bold("Starting analysis..."));
 })().catch((error) => {
-  console.log(chalk.red("✖", error.message));
+  console.log(chalk.red("\n✖", error.message));
   process.exit(1);
 });
