@@ -1,6 +1,6 @@
 import { getDefaultRegion, listAvailableProfiles, readFincostsConfig, setAWSCredentials, setAWSRegion } from "./utils/aws/credentials";
 import { AvailableProviders } from "./enums/availableProviders.enum";
-import { fetchAllInstances } from "./utils/aws/analysis";
+import { analyzeEC2Instances } from "./utils/aws/animations";
 import inquirer from "inquirer";
 import chalk from "chalk";
 
@@ -65,11 +65,10 @@ export async function getRegion() {
   getDefaultRegion(credentialProfile);
   await getRegion();
 
-  await fetchAllInstances().then((instances) => {
-    console.log("\n👉  Found", chalk.green(instances.length), "instances");
-  });
-
   console.log("\n🧪", chalk.bold("Starting analysis..."));
+
+  /* Analysis Functions */
+  analyzeEC2Instances();
 })().catch((error) => {
   console.log(chalk.red("\n✖", error.message));
   process.exit(1);

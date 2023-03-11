@@ -1,12 +1,84 @@
 import { EC2Client, DescribeInstancesCommand } from "@aws-sdk/client-ec2";
+import { CloudWatch } from "@aws-sdk/client-cloudwatch";
 import { fromIni } from "@aws-sdk/credential-providers";
 import { readFincostsConfig } from "./credentials";
 
-export const fetchAllInstances = async (): Promise<any[]> => {
+const LOW_CPU_THRESHOLD = 10;
+
+interface LowCPUInstance {
+  instanceId: string;
+  instanceType: string;
+  cpuUsage: number;
+}
+
+interface CloudWatchInstance {
+  hasLowCPU: boolean;
+  avgCPUUtilization: any;
+}
+
+const hasLowCPUUsage = async (instance: any, cloudWatch: CloudWatch): Promise<CloudWatchInstance> => {
+  const instanceId = instance.InstanceId;
+
+  const metrics = [
+    {
+      Id: "m1",
+      MetricStat: {
+        Metric: {
+          MetricName: "CPUUtilization",
+          Namespace: "AWS/EC2",
+          Dimensions: [{ Name: "InstanceId", Value: instanceId }],
+        },
+        Period: 86400,
+        Stat: "Average",
+      },
+    },
+    {
+      Id: "m2",
+      MetricStat: {
+        Metric: {
+          MetricName: "NetworkIn",
+          Namespace: "AWS/EC2",
+          Dimensions: [{ Name: "InstanceId", Value: instanceId }],
+        },
+        Period: 86400,
+        Stat: "Average",
+      },
+    },
+    {
+      Id: "m3",
+      MetricStat: {
+        Metric: {
+          MetricName: "CPUUtilization",
+          Namespace: "AWS/EC2",
+          Dimensions: [{ Name: "InstanceId", Value: instanceId }],
+        },
+        Period: 300,
+        Stat: "Average",
+      },
+    },
+  ];
+
+  const now = new Date();
+  const startTime = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000); // 28 days ago
+  const endTime = now;
+
+  const data = await cloudWatch.getMetricData({
+    MetricDataQueries: metrics,
+    StartTime: startTime,
+    EndTime: endTime,
+  });
+
+  const cpuUtilization = data.MetricDataResults?.[0].Values?.[0];
+  return { hasLowCPU: cpuUtilization !== undefined && cpuUtilization < LOW_CPU_THRESHOLD, avgCPUUtilization: cpuUtilization };
+};
+
+export const fetchLowCPUInstances = async (): Promise<LowCPUInstance[]> => {
   const { defaultProfile, defaultRegion } = readFincostsConfig();
 
-  console.log("Fetching all instances", defaultProfile, defaultRegion);
-  const ec2 = new EC2Client({ region: defaultRegion, credentials: fromIni({ profile: defaultProfile }) });
+  const AWSConfigs = { region: defaultRegion, credentials: fromIni({ profile: defaultProfile }) };
+
+  const ec2 = new EC2Client(AWSConfigs);
+  const cloudWatch = new CloudWatch(AWSConfigs);
 
   let instances: any[] | PromiseLike<any[]> = [];
   let nextToken: string | undefined;
@@ -25,5 +97,18 @@ export const fetchAllInstances = async (): Promise<any[]> => {
     nextToken = data.NextToken;
   } while (nextToken);
 
-  return instances;
+  const lowCPUInstances: LowCPUInstance[] = [];
+  for (const instance of instances) {
+    const { hasLowCPU, avgCPUUtilization } = await hasLowCPUUsage(instance, cloudWatch);
+
+    if (hasLowCPU) {
+      lowCPUInstances.push({
+        instanceId: instance.InstanceId,
+        instanceType: instance.InstanceType,
+        cpuUsage: avgCPUUtilization,
+      });
+    }
+  }
+
+  return lowCPUInstances;
 };
