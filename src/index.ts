@@ -1,6 +1,6 @@
 import { getDefaultRegion, listAvailableProfiles, readFincostsConfig, setAWSCredentials, setAWSRegion } from "./utils/aws/credentials";
+import { analyzeEC2Instances, findUnattachedEIPs } from "./utils/aws/animations";
 import { AvailableProviders } from "./enums/availableProviders.enum";
-import { analyzeEC2Instances } from "./utils/aws/animations";
 import inquirer from "inquirer";
 import chalk from "chalk";
 
@@ -68,7 +68,8 @@ export async function getRegion() {
   console.log("\n🧪", chalk.bold("Starting analysis..."));
 
   /* Analysis Functions */
-  analyzeEC2Instances();
+  await analyzeEC2Instances();
+  await findUnattachedEIPs();
 })().catch((error) => {
   console.log(chalk.red("\n✖", error.message));
   process.exit(1);

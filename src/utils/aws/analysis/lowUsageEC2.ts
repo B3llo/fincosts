@@ -1,7 +1,7 @@
 import { EC2Client, DescribeInstancesCommand } from "@aws-sdk/client-ec2";
 import { CloudWatch } from "@aws-sdk/client-cloudwatch";
 import { fromIni } from "@aws-sdk/credential-providers";
-import { readFincostsConfig } from "./credentials";
+import { readFincostsConfig } from "../credentials";
 
 const LOW_CPU_THRESHOLD = 10;
 
