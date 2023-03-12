@@ -20,16 +20,15 @@ export const fetchUnattachedEIPs = async (): Promise<UnattachedEIP[]> => {
         Name: "domain",
         Values: ["vpc"],
       },
-      {
-        Name: "association-id",
-        Values: [],
-      },
     ],
   };
 
   const data = await ec2.send(new DescribeAddressesCommand(params));
+  let eips = data.Addresses || [];
 
-  const unattachedEIPs: UnattachedEIP[] = (data.Addresses || []).map((addr) => ({
+  eips = eips.filter((eip) => eip.AssociationId === undefined);
+
+  const unattachedEIPs: UnattachedEIP[] = (eips || []).map((addr) => ({
     publicIp: addr.PublicIp || "",
     allocationId: addr.AllocationId || "",
   }));
