@@ -3,6 +3,7 @@ import { findLowCpuEC2Instances, findUnattachedEIPs, findUnusedNatGateways } fro
 import { AvailableProviders } from "./enums/availableProviders.enum";
 import inquirer from "inquirer";
 import chalk from "chalk";
+import { fetchUnattachedEBSVolumes } from "./utils/aws/analysis/unnatachedEBSVolumes";
 
 export async function getProvider(): Promise<string> {
   const answer = await inquirer.prompt([
@@ -71,6 +72,7 @@ export async function getRegion() {
   await findLowCpuEC2Instances();
   await findUnattachedEIPs();
   await findUnusedNatGateways();
+  await fetchUnattachedEBSVolumes();
 })().catch((error) => {
   console.log(chalk.red("\n✖", error.message));
   process.exit(1);
