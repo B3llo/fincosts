@@ -1,6 +1,6 @@
 import { getDefaultRegion, listAvailableProfiles, readFincostsConfig, setAWSCredentials, setAWSRegion } from "./utils/aws/credentials";
 import { AvailableProviders } from "./enums/availableProviders.enum";
-import { fetchUnattachedEBSVolumes, fetchLowCPUInstances, fetchUnattachedEIPs, fetchUnusedNatGateways, fetchUnattachedENIs } from "./utils/aws/analysis";
+import { fetchUnattachedEBSVolumes, fetchLowCPUInstances, fetchUnattachedEIPs, fetchUnusedNatGateways, fetchUnattachedENIs, fetchOldSnapshots } from "./utils/aws/analysis";
 import inquirer from "inquirer";
 import chalk from "chalk";
 export async function getProvider(): Promise<string> {
@@ -70,7 +70,7 @@ export async function getRegion() {
   await fetchLowCPUInstances();
   await fetchUnattachedEIPs();
   await fetchUnusedNatGateways();
-  // await fetchOldSnapshots(90);
+  await fetchOldSnapshots();
   await fetchUnattachedEBSVolumes();
   await fetchUnattachedENIs();
 })().catch((error) => {

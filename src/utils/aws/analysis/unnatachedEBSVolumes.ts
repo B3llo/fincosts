@@ -1,4 +1,4 @@
-import { EC2Client, DescribeVolumesCommand, DeleteVolumeCommand } from "@aws-sdk/client-ec2";
+import { EC2Client, DescribeVolumesCommand } from "@aws-sdk/client-ec2";
 import { fromIni } from "@aws-sdk/credential-providers";
 import { readFincostsConfig } from "../credentials";
 import ora from "ora";
@@ -42,23 +42,23 @@ export const fetchUnattachedEBSVolumes = async (): Promise<UnattachedEBS[]> => {
   }
 };
 
-export const deleteEBSVolume = async (volumeId: string) => {
-  const { defaultProfile, defaultRegion } = readFincostsConfig();
-  const AWSConfigs = { region: defaultRegion, credentials: fromIni({ profile: defaultProfile }) };
-  const ec2 = new EC2Client(AWSConfigs);
+// export const deleteEBSVolume = async (volumeId: string) => {
+//   const { defaultProfile, defaultRegion } = readFincostsConfig();
+//   const AWSConfigs = { region: defaultRegion, credentials: fromIni({ profile: defaultProfile }) };
+//   const ec2 = new EC2Client(AWSConfigs);
 
-  const spinner = ora(`Deleting EBS volume with ID ${volumeId}`).start();
+//   const spinner = ora(`Deleting EBS volume with ID ${volumeId}`).start();
 
-  try {
-    const params = {
-      VolumeId: volumeId,
-    };
+//   try {
+//     const params = {
+//       VolumeId: volumeId,
+//     };
 
-    await ec2.send(new DeleteVolumeCommand(params));
+//     await ec2.send(new DeleteVolumeCommand(params));
 
-    spinner.succeed(`Deleted EBS volume with ID ${volumeId}`);
-  } catch (error) {
-    spinner.fail(`Error deleting EBS volume with ID ${volumeId}`);
-    throw error;
-  }
-};
+//     spinner.succeed(`Deleted EBS volume with ID ${volumeId}`);
+//   } catch (error) {
+//     spinner.fail(`Error deleting EBS volume with ID ${volumeId}`);
+//     throw error;
+//   }
+// };

@@ -3,67 +3,47 @@ import { fromIni } from "@aws-sdk/credential-providers";
 import { readFincostsConfig } from "../credentials";
 import ora from "ora";
 
-export const fetchOldSnapshots = async (days: number): Promise<string[]> => {
+const OLD_SNAPSHOT_DAYS = 365;
+
+interface OldSnapshot {
+  snapshotId: string;
+  volumeId: string;
+  startTime: Date;
+}
+
+export const fetchOldSnapshots = async (): Promise<OldSnapshot[]> => {
   const { defaultProfile, defaultRegion } = readFincostsConfig();
-
   const AWSConfigs = { region: defaultRegion, credentials: fromIni({ profile: defaultProfile }) };
-
   const ec2 = new EC2Client(AWSConfigs);
 
-  const params = {
-    Filters: [
-      {
-        Name: "status",
-        Values: ["completed"],
-      },
-    ],
-  };
-
-  const spinner = ora("Fetching old snapshots...").start();
+  const spinner = ora(`Fetching snapshots older than ${OLD_SNAPSHOT_DAYS} days`).start();
 
   try {
+    const date = new Date();
+    date.setDate(date.getDate() - OLD_SNAPSHOT_DAYS);
+
+    const params = {
+      Filters: [
+        {
+          Name: "start-time",
+          Values: [date.toISOString()],
+        },
+      ],
+    };
+
     const data = await ec2.send(new DescribeSnapshotsCommand(params));
     const snapshots = data.Snapshots || [];
 
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    const oldSnapshots: OldSnapshot[] = snapshots.map((snapshot) => ({
+      snapshotId: snapshot.SnapshotId || "",
+      volumeId: snapshot.VolumeId || "",
+      startTime: snapshot.StartTime || new Date(),
+    }));
 
-    const oldSnapshots = snapshots.filter((snapshot: any) => {
-      const startTime = new Date(snapshot.StartTime);
-      const diffTime = today.getTime() - startTime.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays >= days;
-    });
-
-    const snapshotIds = oldSnapshots.map((snapshot) => snapshot.SnapshotId || "");
-
-    spinner.succeed(`Found ${snapshotIds.length} old snapshots`);
-
-    return snapshotIds;
+    spinner.succeed(`Found ${oldSnapshots.length} snapshots older than ${OLD_SNAPSHOT_DAYS} days`);
+    return oldSnapshots;
   } catch (error) {
-    spinner.fail("Failed to fetch old snapshots");
+    spinner.fail(`Error fetching snapshots older than ${OLD_SNAPSHOT_DAYS} days`);
     throw error;
   }
 };
-
-// export const deleteSnapshot = async (snapshotId: string) => {
-//   const { defaultProfile, defaultRegion } = readFincostsConfig();
-
-//   const AWSConfigs = { region: defaultRegion, credentials: fromIni({ profile: defaultProfile }) };
-
-//   const ec2 = new EC2Client(AWSConfigs);
-
-//   const params = {
-//     SnapshotId: snapshotId,
-//   };
-
-//   const spinner = ora(`Deleting snapshot ${snapshotId}...`).start();
-
-//   try {
-//     await ec2.send(new DeleteSnapshotCommand(params));
-//     spinner.succeed(`Deleted snapshot ${snapshotId}`);
-//   } catch (error) {
-//     spinner.fail(`Failed to delete snapshot ${snapshotId}`);
-//     throw error;
-//   }
-// };
