@@ -1,7 +1,7 @@
 import ora from "ora";
 import { fetchLowCPUInstances } from "./analysis/lowUsageEC2";
 import { fetchUnattachedEIPs } from "./analysis/unnatachedEIP";
-import { fetchUnusedNatGateways } from "./analysis/unuseNatGateways";
+import { fetchUnusedNatGateways } from "./analysis/unusedNatGateways";
 
 export async function findLowCpuEC2Instances() {
   const spinner = ora("Finding instances with low CPU usage...").start();

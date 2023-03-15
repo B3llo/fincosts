@@ -1,10 +1,8 @@
 import { getDefaultRegion, listAvailableProfiles, readFincostsConfig, setAWSCredentials, setAWSRegion } from "./utils/aws/credentials";
-import { findLowCpuEC2Instances, findUnattachedEIPs, findUnusedNatGateways } from "./utils/aws/animations";
 import { AvailableProviders } from "./enums/availableProviders.enum";
+import { fetchUnattachedEBSVolumes, fetchLowCPUInstances, fetchUnattachedEIPs, fetchUnusedNatGateways, fetchUnattachedENIs } from "./utils/aws/analysis";
 import inquirer from "inquirer";
 import chalk from "chalk";
-import { fetchUnattachedEBSVolumes } from "./utils/aws/analysis/unnatachedEBSVolumes";
-
 export async function getProvider(): Promise<string> {
   const answer = await inquirer.prompt([
     {
@@ -69,10 +67,12 @@ export async function getRegion() {
   console.log("\n🧪", chalk.bold("Starting analysis..."));
 
   /* Analysis Functions */
-  await findLowCpuEC2Instances();
-  await findUnattachedEIPs();
-  await findUnusedNatGateways();
+  await fetchLowCPUInstances();
+  await fetchUnattachedEIPs();
+  await fetchUnusedNatGateways();
+  // await fetchOldSnapshots(90);
   await fetchUnattachedEBSVolumes();
+  await fetchUnattachedENIs();
 })().catch((error) => {
   console.log(chalk.red("\n✖", error.message));
   process.exit(1);

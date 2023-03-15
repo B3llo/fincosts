@@ -2,6 +2,7 @@ import { CloudWatchClient, GetMetricStatisticsCommand } from "@aws-sdk/client-cl
 import { EC2Client, DescribeNatGatewaysCommand } from "@aws-sdk/client-ec2";
 import { fromIni } from "@aws-sdk/credential-providers";
 import { readFincostsConfig } from "../credentials";
+import ora from "ora";
 
 interface UnusedNATGateway {
   id: string;
@@ -17,6 +18,8 @@ export const fetchUnusedNatGateways = async (): Promise<UnusedNATGateway[]> => {
   const cw = new CloudWatchClient(AWSConfigs);
 
   const natGatewaysParams = {};
+
+  const spinner = ora("Fetching NAT gateways...").start();
 
   const natGatewaysData = await ec2.send(new DescribeNatGatewaysCommand(natGatewaysParams));
 
@@ -44,6 +47,8 @@ export const fetchUnusedNatGateways = async (): Promise<UnusedNATGateway[]> => {
       unusedNATGateways.push({ id: natGatewayId, eip: eipAllocationId });
     }
   }
+
+  spinner.succeed(`Found ${unusedNATGateways.length} unused NAT gateways`);
 
   return unusedNATGateways;
 };

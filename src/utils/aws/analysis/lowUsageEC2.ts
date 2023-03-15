@@ -2,8 +2,9 @@ import { EC2Client, DescribeInstancesCommand } from "@aws-sdk/client-ec2";
 import { CloudWatch } from "@aws-sdk/client-cloudwatch";
 import { fromIni } from "@aws-sdk/credential-providers";
 import { readFincostsConfig } from "../credentials";
+import ora from "ora";
 
-const LOW_CPU_THRESHOLD = 10;
+const LOW_CPU_THRESHOLD = 40;
 
 interface LowCPUInstance {
   instanceId: string;
@@ -73,42 +74,50 @@ const hasLowCPUUsage = async (instance: any, cloudWatch: CloudWatch): Promise<Cl
 };
 
 export const fetchLowCPUInstances = async (): Promise<LowCPUInstance[]> => {
-  const { defaultProfile, defaultRegion } = readFincostsConfig();
+  const spinner = ora("Fetching low CPU instances").start();
 
-  const AWSConfigs = { region: defaultRegion, credentials: fromIni({ profile: defaultProfile }) };
+  try {
+    const { defaultProfile, defaultRegion } = readFincostsConfig();
 
-  const ec2 = new EC2Client(AWSConfigs);
-  const cloudWatch = new CloudWatch(AWSConfigs);
+    const AWSConfigs = { region: defaultRegion, credentials: fromIni({ profile: defaultProfile }) };
 
-  let instances: any[] | PromiseLike<any[]> = [];
-  let nextToken: string | undefined;
+    const ec2 = new EC2Client(AWSConfigs);
+    const cloudWatch = new CloudWatch(AWSConfigs);
 
-  do {
-    const params = {
-      MaxResults: 1000,
-      NextToken: nextToken,
-    };
+    let instances: any[] | PromiseLike<any[]> = [];
+    let nextToken: string | undefined;
 
-    const data = await ec2.send(new DescribeInstancesCommand(params));
-    const reservations = data.Reservations || [];
-    const reservationInstances = reservations.flatMap((r) => r.Instances) || [];
-    instances = [...instances, ...reservationInstances];
+    do {
+      const params = {
+        MaxResults: 1000,
+        NextToken: nextToken,
+      };
 
-    nextToken = data.NextToken;
-  } while (nextToken);
+      const data = await ec2.send(new DescribeInstancesCommand(params));
+      const reservations = data.Reservations || [];
+      const reservationInstances = reservations.flatMap((r) => r.Instances) || [];
+      instances = [...instances, ...reservationInstances];
 
-  const lowCPUInstances: LowCPUInstance[] = [];
-  for (const instance of instances) {
-    const { hasLowCPU, avgCPUUtilization } = await hasLowCPUUsage(instance, cloudWatch);
+      nextToken = data.NextToken;
+    } while (nextToken);
 
-    if (hasLowCPU) {
-      lowCPUInstances.push({
-        instanceId: instance.InstanceId,
-        instanceType: instance.InstanceType,
-        cpuUsage: avgCPUUtilization,
-      });
+    const lowCPUInstances: LowCPUInstance[] = [];
+    for (const instance of instances) {
+      const { hasLowCPU, avgCPUUtilization } = await hasLowCPUUsage(instance, cloudWatch);
+
+      if (hasLowCPU) {
+        lowCPUInstances.push({
+          instanceId: instance.InstanceId,
+          instanceType: instance.InstanceType,
+          cpuUsage: avgCPUUtilization,
+        });
+      }
     }
-  }
 
-  return lowCPUInstances;
+    spinner.succeed(`Found ${lowCPUInstances.length} low CPU instances`);
+    return lowCPUInstances;
+  } catch (error) {
+    spinner.fail("Failed to fetch low CPU instances");
+    throw error;
+  }
 };

@@ -1,6 +1,7 @@
 import { EC2Client, DescribeAddressesCommand } from "@aws-sdk/client-ec2";
 import { fromIni } from "@aws-sdk/credential-providers";
 import { readFincostsConfig } from "../credentials";
+import ora from "ora";
 
 interface UnattachedEIP {
   publicIp: string;
@@ -23,15 +24,24 @@ export const fetchUnattachedEIPs = async (): Promise<UnattachedEIP[]> => {
     ],
   };
 
-  const data = await ec2.send(new DescribeAddressesCommand(params));
-  let eips = data.Addresses || [];
+  const spinner = ora("Fetching unattached EIPs").start();
 
-  eips = eips.filter((eip) => eip.AssociationId === undefined);
+  try {
+    const data = await ec2.send(new DescribeAddressesCommand(params));
+    let eips = data.Addresses || [];
 
-  const unattachedEIPs: UnattachedEIP[] = (eips || []).map((addr) => ({
-    publicIp: addr.PublicIp || "",
-    allocationId: addr.AllocationId || "",
-  }));
+    eips = eips.filter((eip) => eip.AssociationId === undefined);
 
-  return unattachedEIPs;
+    const unattachedEIPs: UnattachedEIP[] = (eips || []).map((addr) => ({
+      publicIp: addr.PublicIp || "",
+      allocationId: addr.AllocationId || "",
+    }));
+
+    spinner.succeed(`Found ${unattachedEIPs.length} unattached EIPs`);
+
+    return unattachedEIPs;
+  } catch (err) {
+    spinner.fail(`Failed to fetch unattached EIPs: ${err}`);
+    throw err;
+  }
 };
