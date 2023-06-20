@@ -118,6 +118,7 @@ export const fetchLowCPUInstances = async (): Promise<LowCPUInstance[]> => {
     return lowCPUInstances;
   } catch (error) {
     spinner.fail("Failed to fetch low CPU instances");
+    console.error(error);
     throw error;
   }
 };

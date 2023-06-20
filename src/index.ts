@@ -1,6 +1,14 @@
 import { getDefaultRegion, listAvailableProfiles, readFincostsConfig, setAWSCredentials, setAWSRegion } from "./utils/aws/credentials";
 import { AvailableProviders } from "./enums/availableProviders.enum";
 import { fetchUnattachedEBSVolumes, fetchLowCPUInstances, fetchUnattachedEIPs, fetchUnusedNatGateways, fetchUnattachedENIs, fetchOldSnapshots } from "./utils/aws/analysis";
+import { getCloudSQLStats, analyzeBucketUsage, fetchLowCPUInstancesGCP } from "./utils/gcp/analysis";
+import {
+  getDefaultRegion as getDefaultRegionGCP,
+  listAvailableProfiles as listAvailableProfilesGCP,
+  readFincostsConfig as readFincostsConfigGCP,
+  setGCPCredentials,
+  setGCPRegion,
+} from "./utils/gcp/credentials";
 import inquirer from "inquirer";
 import chalk from "chalk";
 export async function getProvider(): Promise<string> {
@@ -16,15 +24,22 @@ export async function getProvider(): Promise<string> {
   return answer.cloudProvider;
 }
 
-export async function getCredentialProfile(): Promise<string> {
-  const credentials = await listAvailableProfiles();
-  const choices = Object.keys(credentials.credentialsFile);
+export async function getCredentialProfile(provider: string): Promise<string> {
+  let credentials: any;
+
+  if (provider === "AWS") {
+    credentials = await listAvailableProfiles();
+  } else if (provider === "GCP") {
+    credentials = await listAvailableProfilesGCP();
+  }
+
+  const choices = Object.keys(credentials?.credentialsFile);
 
   const answer = await inquirer.prompt([
     {
       type: "list",
       name: "credentialProfile",
-      message: "\nWhich AWS credential profile do you want to use?",
+      message: `\nWhich ${provider} credential profile do you want to use?`,
       choices: choices,
     },
   ]);
@@ -32,8 +47,14 @@ export async function getCredentialProfile(): Promise<string> {
   return answer.credentialProfile;
 }
 
-export async function getRegion() {
-  const defaultRegion = readFincostsConfig().defaultRegion;
+export async function getRegion(provider: string) {
+  let defaultRegion;
+  if (provider === "AWS") {
+    defaultRegion = readFincostsConfig().defaultRegion;
+  } else if (provider === "GCP") {
+    defaultRegion = readFincostsConfigGCP().defaultRegion;
+  }
+
   const answer = await inquirer.prompt([
     {
       type: "input",
@@ -43,7 +64,11 @@ export async function getRegion() {
     },
   ]);
 
-  setAWSRegion(answer.region);
+  if (provider === "AWS") {
+    setAWSRegion(answer.region);
+  } else if (provider === "GCP") {
+    setGCPRegion(answer.region);
+  }
 }
 
 (async () => {
@@ -56,24 +81,39 @@ export async function getRegion() {
 
   console.log("👉  You selected", chalk.green(provider));
 
-  const credentialProfile = await getCredentialProfile();
-  console.log("👉  Using AWS credential profile", chalk.green(credentialProfile));
+  const credentialProfile = await getCredentialProfile(provider);
+  console.log(`👉  Using ${provider} credential profile`, chalk.green(credentialProfile));
 
-  setAWSCredentials(credentialProfile);
+  if (provider === "AWS") {
+    setAWSCredentials(credentialProfile);
+    getDefaultRegion(credentialProfile);
+  } else if (provider === "GCP") {
+    setGCPCredentials(credentialProfile);
+    getDefaultRegionGCP(credentialProfile);
+  }
 
-  getDefaultRegion(credentialProfile);
-  await getRegion();
+  await getRegion(provider);
 
   console.log("\n🧪", chalk.bold("Starting analysis..."));
 
   /* Analysis Functions */
-  await fetchLowCPUInstances();
-  await fetchUnattachedEIPs();
-  await fetchUnusedNatGateways();
-  await fetchOldSnapshots();
-  await fetchUnattachedEBSVolumes();
-  await fetchUnattachedENIs();
+  if (provider === "AWS") {
+    await fetchLowCPUInstances();
+    await fetchUnattachedEIPs();
+    await fetchUnusedNatGateways();
+    await fetchOldSnapshots();
+    await fetchUnattachedEBSVolumes();
+    await fetchUnattachedENIs();
+  } else if (provider === "GCP") {
+    await getCloudSQLStats("5657281292773709007");
+    await analyzeBucketUsage();
+    await fetchLowCPUInstancesGCP();
+    await checkCloudSQL();
+  }
 })().catch((error) => {
   console.log(chalk.red("\n✖", error.message));
   process.exit(1);
 });
+function checkCloudSQL() {
+  throw new Error("Function not implemented.");
+}

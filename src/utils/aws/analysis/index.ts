@@ -4,3 +4,4 @@ export * from "./lowUsageEC2";
 export * from "./unnatachedEIP";
 export * from "./unusedNatGateways";
 export * from "./oldEBSSnapshots";
+export * from "./unusedLoadBalancers";
