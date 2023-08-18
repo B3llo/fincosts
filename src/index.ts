@@ -1,48 +1,42 @@
-import { getDefaultRegion, listAvailableProfiles, readFincostsConfig, setAWSCredentials, setAWSRegion } from "./utils/aws/credentials";
 import { AvailableProviders } from "./enums/availableProviders.enum";
 import { fetchUnattachedEBSVolumes, fetchLowCPUInstances, fetchUnattachedEIPs, fetchUnusedNatGateways, fetchUnattachedENIs, fetchOldSnapshots } from "./utils/aws/analysis";
 import { getCloudSQLStats, analyzeBucketUsage, fetchLowCPUInstancesGCP } from "./utils/gcp/analysis";
-import { getDefaultRegion as getDefaultRegionGCP, listAvailableProfiles as listAvailableProfilesGCP, readFincostsConfig as readFincostsConfigGCP, setGCPCredentials, setGCPRegion } from "./utils/gcp/credentials";
-import { getDefaultRegion as getDefaultRegionAzure, listAvailableProfiles as listAvailableProfilesAzure, readFincostsConfig as readFincostsConfigAzure, setAzureCredentials, setAzureRegion } from "./utils/azure/credentials";
 import { fetchLowCPUInstancesAzure, analyzeBlobUsage, getAzureSQLStats } from "./utils/azure/analysis";
+import { listAvailableProfiles, readFincostsConfig, setCredentials, setRegion, getDefaultRegion } from "./utils/unifiedCredentials";
 import inquirer from "inquirer";
 import chalk from "chalk";
 
-export async function getProvider(): Promise<string> {
+export async function getProvider(): Promise<"aws" | "gcp" | "azure"> {
   const answer = await inquirer.prompt([
     {
       type: "list",
       name: "cloudProvider",
       message: "\nWhich cloud provider do you want to analyze?",
-      choices: ["AWS", "GCP", "Azure"],
+      choices: Object.values(AvailableProviders), // Using the values directly
     },
   ]);
-
-  return answer.cloudProvider;
+  return answer.cloudProvider.toLowerCase() as "aws" | "gcp" | "azure";
 }
 
-export async function getCredentialProfile(provider: string): Promise<string> {
-  let credentials: any;
+type AWSProfile = {
+  credentialsFile: Record<string, unknown>;
+};
 
-  switch (provider) {
-    case "AWS":
-      credentials = await listAvailableProfiles();
-      break;
-    case "GCP":
-      credentials = await listAvailableProfilesGCP();
-      break;
-    case "Azure":
-      credentials = await listAvailableProfilesAzure();
-      break;
+export async function getCredentialProfile(provider: "aws" | "gcp" | "azure"): Promise<string> {
+  const credentials = await listAvailableProfiles(provider);
+  let choices: string[] = [];
+
+  if (provider === "aws" && isAWSProfile(credentials)) {
+    choices = Object.keys(credentials.credentialsFile);
+  } else if (Array.isArray(credentials)) {
+    choices = credentials;
   }
-
-  const choices = Object.keys(credentials?.credentialsFile);
 
   const answer = await inquirer.prompt([
     {
       type: "list",
       name: "credentialProfile",
-      message: `\nWhich ${provider} credential profile do you want to use?`,
+      message: `\nWhich ${provider.toUpperCase()} credential profile do you want to use?`, // Convert to uppercase for display
       choices: choices,
     },
   ]);
@@ -50,21 +44,12 @@ export async function getCredentialProfile(provider: string): Promise<string> {
   return answer.credentialProfile;
 }
 
-export async function getRegion(provider: string) {
-  let defaultRegion;
+function isAWSProfile(credentials: any): credentials is AWSProfile {
+  return credentials && typeof credentials === "object" && "credentialsFile" in credentials;
+}
 
-  switch (provider) {
-    case "AWS":
-      defaultRegion = readFincostsConfig().defaultRegion;
-      break;
-    case "GCP":
-      defaultRegion = readFincostsConfigGCP().defaultRegion;
-      break;
-    case "Azure":
-      defaultRegion = readFincostsConfigAzure().defaultRegion;
-      break;
-  }
-
+export async function getRegion(provider: "aws" | "gcp" | "azure") {
+  const defaultRegion = readFincostsConfig(provider).defaultRegion;
   const answer = await inquirer.prompt([
     {
       type: "input",
@@ -73,22 +58,11 @@ export async function getRegion(provider: string) {
       default: defaultRegion,
     },
   ]);
-
-  switch (provider) {
-    case "AWS":
-      setAWSRegion(answer.region);
-      break;
-    case "GCP":
-      setGCPRegion(answer.region);
-      break;
-    case "Azure":
-      setAzureRegion(answer.region);
-      break;
-  }
+  setRegion(provider, answer.region);
 }
 
 (async () => {
-  let provider = await getProvider();
+  const provider = await getProvider();
 
   if (!Object.values(AvailableProviders).includes(provider)) {
     console.log("\n😞 Sorry, we currently do not support this provider");
@@ -96,32 +70,15 @@ export async function getRegion(provider: string) {
   }
 
   console.log("👉  You selected", chalk.green(provider));
-
   const credentialProfile = await getCredentialProfile(provider);
   console.log(`👉  Using ${provider} credential profile`, chalk.green(credentialProfile));
-
-  switch (provider) {
-    case "AWS":
-      setAWSCredentials(credentialProfile);
-      getDefaultRegion(credentialProfile);
-      break;
-    case "GCP":
-      setGCPCredentials(credentialProfile);
-      getDefaultRegionGCP(credentialProfile);
-      break;
-    case "Azure":
-      setAzureCredentials(credentialProfile);
-      getDefaultRegionAzure(credentialProfile);
-      break;
-  }
-
+  setCredentials(provider, credentialProfile);
+  getDefaultRegion(provider);
   await getRegion(provider);
-
   console.log("\n🧪", chalk.bold("Starting analysis..."));
 
-  /* Analysis Functions */
   switch (provider) {
-    case "AWS":
+    case "aws":
       await fetchLowCPUInstances();
       await fetchUnattachedEIPs();
       await fetchUnusedNatGateways();
@@ -129,12 +86,12 @@ export async function getRegion(provider: string) {
       await fetchUnattachedEBSVolumes();
       await fetchUnattachedENIs();
       break;
-    case "GCP":
+    case "gcp":
       await getCloudSQLStats("5657281292773709007");
       await analyzeBucketUsage();
       await fetchLowCPUInstancesGCP();
       break;
-    case "Azure":
+    case "azure":
       await fetchLowCPUInstancesAzure();
       await analyzeBlobUsage();
       await getAzureSQLStats();

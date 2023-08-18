@@ -60,6 +60,56 @@ export const readFincostsConfig = (provider: "aws" | "gcp" | "azure"): ProviderC
   return config;
 };
 
+export const listAvailableProfiles = async (provider: "aws" | "gcp" | "azure") => {
+  switch (provider) {
+    case "aws":
+      const awsConfig = await listAvailableAWSProfiles();
+      if (awsConfig && "credentialsFile" in awsConfig) {
+        return Object.keys(awsConfig.credentialsFile);
+      }
+      break;
+    case "gcp":
+      return await listAvailableGCPProfiles();
+    case "azure":
+      return await listAvailableAzureProfiles();
+    default:
+      return [];
+  }
+};
+
+export const setCredentials = (provider: "aws" | "gcp" | "azure", profileName: string) => {
+  switch (provider) {
+    case "aws":
+      setAWSCredentials(profileName);
+      break;
+    case "gcp":
+      setGCPCredentials(profileName);
+      break;
+    case "azure":
+      setAzureCredentials(profileName);
+      break;
+  }
+};
+
+export const setRegion = (provider: "aws" | "gcp" | "azure", region: string) => {
+  switch (provider) {
+    case "aws":
+      setAWSRegion(region);
+      break;
+    case "gcp":
+      setGCPRegion(region);
+      break;
+    case "azure":
+      setAzureRegion(region);
+      break;
+  }
+};
+
+export const getDefaultRegion = (provider: "aws" | "gcp" | "azure") => {
+  const config = readFincostsConfig(provider);
+  return config.defaultRegion;
+};
+
 function writeFincostsConfig(provider: "aws" | "gcp" | "azure", config: ProviderConfig) {
   let globalConfig: FincostsConfig;
   try {
