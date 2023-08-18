@@ -40,4 +40,4 @@ npm link
 
 <hr>
 
-####License: [MIT](LICENSE)
+**License**: [MIT](LICENSE)
