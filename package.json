@@ -18,6 +18,7 @@
     "@aws-sdk/client-elastic-load-balancing-v2": "^3.297.0",
     "@aws-sdk/credential-providers": "^3.289.0",
     "@aws-sdk/shared-ini-file-loader": "^3.287.0",
+    "@azure/identity": "^3.3.0",
     "@google-cloud/compute": "^3.9.1",
     "@google-cloud/monitoring": "^3.0.4",
     "@google-cloud/storage": "^6.11.0",
