@@ -67,7 +67,7 @@ export const listAvailableProfiles = async (provider: "aws" | "gcp" | "azure") =
       if (awsConfig && "credentialsFile" in awsConfig) {
         return Object.keys(awsConfig.credentialsFile);
       }
-      break;
+      return [];
     case "gcp":
       return await listAvailableGCPProfiles();
     case "azure":
