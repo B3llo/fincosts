@@ -22,6 +22,7 @@
     "@azure/arm-monitor": "^7.0.0",
     "@azure/identity": "^3.3.0",
     "@azure/monitor-query": "^1.1.1",
+    "@azure/storage-blob": "^12.15.0",
     "@google-cloud/compute": "^3.9.1",
     "@google-cloud/monitoring": "^3.0.4",
     "@google-cloud/storage": "^6.11.0",
