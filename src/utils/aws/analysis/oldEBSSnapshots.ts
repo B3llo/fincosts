@@ -30,6 +30,7 @@ export const fetchOldSnapshots = async (): Promise<OldSnapshot[]> => {
         },
       ],
     };
+    //
 
     const data = await ec2.send(new DescribeSnapshotsCommand(params));
     const snapshots = data.Snapshots || [];
