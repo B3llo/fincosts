@@ -1,7 +1,7 @@
 import { AvailableProviders } from "./enums/availableProviders.enum";
 import { fetchUnattachedEBSVolumes, fetchLowCPUInstances, fetchUnattachedEIPs, fetchUnusedNatGateways, fetchUnattachedENIs, fetchOldSnapshots } from "./utils/aws/analysis";
 import { getCloudSQLStats, analyzeBucketUsage, fetchLowCPUInstancesGCP } from "./utils/gcp/analysis";
-import { fetchLowCPUInstancesAzure, analyzeBlobUsage, getAzureSQLStats } from "./utils/azure/analysis";
+import { fetchLowCPUInstancesAzure, analyzeBlobUsage, getAzureSQLStats, analyzeDiskVolumes } from "./utils/azure/analysis";
 import { listAvailableProfiles, readFincostsConfig, setCredentials, setRegion, getDefaultRegion } from "./utils/unifiedCredentials";
 import inquirer from "inquirer";
 import chalk from "chalk";
@@ -144,6 +144,7 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
       // await fetchLowCPUInstancesAzure();
       await analyzeBlobUsage();
       await getAzureSQLStats();
+      await analyzeDiskVolumes();
       break;
   }
 
