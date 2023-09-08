@@ -5,6 +5,7 @@ import { fetchLowCPUInstancesAzure, analyzeBlobUsage, getAzureSQLStats } from ".
 import { listAvailableProfiles, readFincostsConfig, setCredentials, setRegion, getDefaultRegion } from "./utils/unifiedCredentials";
 import inquirer from "inquirer";
 import chalk from "chalk";
+import { Chart } from "chart.js";
 import puppeteer from "puppeteer";
 
 export async function getProvider(): Promise<"aws" | "gcp" | "azure"> {
@@ -62,19 +63,42 @@ export async function getRegion(provider: "aws" | "gcp" | "azure") {
   setRegion(provider, answer.region);
 }
 
-async function generateReport() {
+async function generateReport(data: { labels: any; values: any } | undefined) {
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
 
   const content = `
     <html>
+      <head>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+      </head>
       <body>
         <h1>Analysis Report</h1>
         <div id="chart-div" style="width:400px; height:400px;"></div>
       </body>
       <script>
-        // Your Chart.js code here to generate charts
-        // You could use your analysis data to populate the charts
+        // Initialize Chart.js here
+        const ctx = document.getElementById('chart-div').getContext('2d');
+        const myChart = new Chart(ctx, {
+          type: 'bar', // or 'line', 'pie', etc.
+          data: {
+            labels: ${JSON.stringify(data?.labels)},
+            datasets: [{
+              label: '# of Instances',
+              data: ${JSON.stringify(data?.values)},
+              backgroundColor: 'rgba(75, 192, 192, 0.2)',
+              borderColor: 'rgba(75, 192, 192, 1)',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
       </script>
     </html>
   `;
@@ -131,8 +155,13 @@ async function generateReport() {
     },
   ]);
 
+  const analysisData = {
+    labels: ["AWS", "GCP", "Azure"],
+    values: [5, 3, 7], // Will be updated with actual values in the future
+  };
+
   if (answers.downloadReport) {
-    await generateReport();
+    await generateReport(analysisData);
   }
 })().catch((error) => {
   console.log(chalk.red("\n✖", error.message));
