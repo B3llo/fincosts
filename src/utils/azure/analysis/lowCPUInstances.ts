@@ -1,5 +1,5 @@
 import { ComputeManagementClient } from "@azure/arm-compute";
-import { GetMetricDefinitionsOptions, QueryMetricsOptions, MetricsQueryClient } from "@azure/monitor-query";
+import { MetricsQueryClient } from "@azure/monitor-query";
 import { DefaultAzureCredential } from "@azure/identity";
 import ora from "ora";
 
@@ -13,13 +13,14 @@ interface LowCPUInstance {
 
 const hasLowCPUUsage = async (resourceId: string, metricsQueryClient: MetricsQueryClient): Promise<number | undefined> => {
   const now = new Date();
-  const startTime = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000); // 28 days ago
+  const startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30days ago
 
-  const metricResponse = await metricsQueryClient.queryMetrics(resourceId, {
-    metricNames: ["Percentage CPU"],
+  const metricResponse = await metricsQueryClient.queryResource(resourceId, ["Percentage CPU"], {
     aggregations: ["Average"],
-    startTime,
-    endTime: now,
+    timespan: {
+      startTime: startTime,
+      endTime: now,
+    },
   });
 
   const cpuData = metricResponse.metrics?.[0].timeseries?.[0].data;
@@ -38,9 +39,9 @@ export const fetchLowCPUInstancesAzure = async (): Promise<LowCPUInstance[]> => 
     const vmList = await computeClient.virtualMachines.listAll();
     const lowCPUInstances: LowCPUInstance[] = [];
 
-    for (const vm of vmList) {
+    for await (const vm of vmList) {
       const resourceId = vm.id!;
-      const instanceType = vm.hardwareProfile!.vmSize;
+      const instanceType: any = vm.hardwareProfile!.vmSize;
 
       const cpuUtilization = await hasLowCPUUsage(resourceId, metricsQueryClient);
 

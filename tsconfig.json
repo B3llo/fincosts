@@ -17,6 +17,7 @@
     "noUnusedParameters": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "removeComments": true
+    "removeComments": true,
+    "lib": ["es5", "es6", "dom", "dom.iterable"]
   }
 }
