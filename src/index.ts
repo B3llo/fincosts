@@ -5,8 +5,18 @@ import { fetchLowCPUInstancesAzure, analyzeBlobUsage, getAzureSQLStats, analyzeD
 import { listAvailableProfiles, readFincostsConfig, setCredentials, setRegion, getDefaultRegion } from "./utils/unifiedCredentials";
 import inquirer from "inquirer";
 import chalk from "chalk";
-import { Chart } from "chart.js";
 import puppeteer from "puppeteer";
+import fs from "fs";
+import path from "path";
+
+function ensureFincostsFileExists() {
+  const fincostsPath = path.join(__dirname, ".fincosts");
+  console.log(`Looking for .fincosts file at: ${fincostsPath}`);
+  if (!fs.existsSync(fincostsPath)) {
+    fs.writeFileSync(fincostsPath, "{}");
+    console.log(chalk.green("Created a new .fincosts file."));
+  }
+}
 
 export async function getProvider(): Promise<"aws" | "gcp" | "azure"> {
   const answer = await inquirer.prompt([
@@ -110,7 +120,60 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
   console.log("Report has been generated as AnalysisReport.pdf");
 }
 
+async function performAWSAnalysis() {
+  try {
+    const credentialProfile = await getCredentialProfile("aws");
+    console.log(`👉  Using AWS credential profile`, chalk.green(credentialProfile));
+    setCredentials("aws", credentialProfile);
+    getDefaultRegion("aws");
+    await getRegion("aws");
+
+    await fetchLowCPUInstances();
+    await fetchUnattachedEIPs();
+    await fetchUnusedNatGateways();
+    await fetchOldSnapshots();
+    await fetchUnattachedEBSVolumes();
+    await fetchUnattachedENIs();
+  } catch (error: any) {
+    console.error(chalk.red("Error with AWS analysis: ", error.message));
+  }
+}
+
+async function performGCPAnalysis() {
+  try {
+    const credentialProfile = await getCredentialProfile("gcp");
+    console.log(`👉  Using GCP credential profile`, chalk.green(credentialProfile));
+    setCredentials("gcp", credentialProfile);
+    getDefaultRegion("gcp");
+    await getRegion("gcp");
+
+    await getCloudSQLStats("5657281292773709007");
+    await analyzeBucketUsage();
+    await fetchLowCPUInstancesGCP();
+  } catch (error: any) {
+    console.error(chalk.red("Error with GCP analysis: ", error.message));
+  }
+}
+
+async function performAzureAnalysis() {
+  try {
+    const credentialProfile = await getCredentialProfile("azure");
+    console.log(`👉  Using Azure credential profile`, chalk.green(credentialProfile));
+    setCredentials("azure", credentialProfile);
+    getDefaultRegion("azure");
+    await getRegion("azure");
+
+    // await fetchLowCPUInstancesAzure(); // This was commented out in your original code
+    await analyzeBlobUsage();
+    await getAzureSQLStats();
+    await analyzeDiskVolumes();
+  } catch (error: any) {
+    console.error(chalk.red("Error with Azure analysis: ", error.message));
+  }
+}
+
 (async () => {
+  ensureFincostsFileExists();
   const provider = await getProvider();
 
   if (!Object.values(AvailableProviders).includes(provider)) {
@@ -119,52 +182,45 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
   }
 
   console.log("👉  You selected", chalk.green(provider));
-  const credentialProfile = await getCredentialProfile(provider);
-  console.log(`👉  Using ${provider} credential profile`, chalk.green(credentialProfile));
-  setCredentials(provider, credentialProfile);
-  getDefaultRegion(provider);
-  await getRegion(provider);
-  console.log("\n🧪", chalk.bold("Starting analysis..."));
 
-  switch (provider) {
-    case "aws":
-      await fetchLowCPUInstances();
-      await fetchUnattachedEIPs();
-      await fetchUnusedNatGateways();
-      await fetchOldSnapshots();
-      await fetchUnattachedEBSVolumes();
-      await fetchUnattachedENIs();
-      break;
-    case "gcp":
-      await getCloudSQLStats("5657281292773709007");
-      await analyzeBucketUsage();
-      await fetchLowCPUInstancesGCP();
-      break;
-    case "azure":
-      // await fetchLowCPUInstancesAzure();
-      await analyzeBlobUsage();
-      await getAzureSQLStats();
-      await analyzeDiskVolumes();
-      break;
+  try {
+    const credentialProfile = await getCredentialProfile(provider);
+    console.log(`👉  Using ${provider} credential profile`, chalk.green(credentialProfile));
+    setCredentials(provider, credentialProfile);
+    getDefaultRegion(provider);
+    await getRegion(provider);
+    console.log("\n🧪", chalk.bold("Starting analysis..."));
+
+    switch (provider) {
+      case "aws":
+        await performAWSAnalysis();
+        break;
+      case "gcp":
+        await performGCPAnalysis();
+        break;
+      case "azure":
+        await performAzureAnalysis();
+        break;
+    }
+
+    const answers = await inquirer.prompt([
+      {
+        type: "confirm",
+        name: "downloadReport",
+        message: "Would you like to download the analysis report?",
+      },
+    ]);
+
+    const analysisData = {
+      labels: ["AWS", "GCP", "Azure"],
+      values: [5, 3, 7], // Will be updated with actual values in the future
+    };
+
+    if (answers.downloadReport) {
+      await generateReport(analysisData);
+    }
+  } catch (error: any) {
+    console.log(chalk.red("\n✖", error.message));
+    process.exit(1);
   }
-
-  const answers = await inquirer.prompt([
-    {
-      type: "confirm",
-      name: "downloadReport",
-      message: "Would you like to download the analysis report?",
-    },
-  ]);
-
-  const analysisData = {
-    labels: ["AWS", "GCP", "Azure"],
-    values: [5, 3, 7], // Will be updated with actual values in the future
-  };
-
-  if (answers.downloadReport) {
-    await generateReport(analysisData);
-  }
-})().catch((error) => {
-  console.log(chalk.red("\n✖", error.message));
-  process.exit(1);
-});
+})();
