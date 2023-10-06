@@ -1,4 +1,4 @@
-import { ComputeManagementClient } from "@azure/arm-compute";
+import { ComputeManagementClient, VirtualMachine } from "@azure/arm-compute";
 import { MetricsQueryClient } from "@azure/monitor-query";
 import { DefaultAzureCredential } from "@azure/identity";
 import ora from "ora";
@@ -37,6 +37,8 @@ export const fetchLowCPUInstancesAzure = async (): Promise<LowCPUInstance[]> => 
     const metricsQueryClient = new MetricsQueryClient(credential);
 
     const vmList = await computeClient.virtualMachines.listAll();
+    const vms: VirtualMachine[] = [];
+
     const lowCPUInstances: LowCPUInstance[] = [];
 
     for await (const vm of vmList) {

@@ -7,10 +7,14 @@ import inquirer from "inquirer";
 import chalk from "chalk";
 import puppeteer from "puppeteer";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import path from "path";
+import { getAzureCredentials, setAzureCredentials } from "./utils/azure/credentials";
 
 function ensureFincostsFileExists() {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const fincostsPath = path.join(__dirname, ".fincosts");
+
   console.log(`Looking for .fincosts file at: ${fincostsPath}`);
   if (!fs.existsSync(fincostsPath)) {
     fs.writeFileSync(fincostsPath, "{}");
@@ -159,11 +163,13 @@ async function performAzureAnalysis() {
   try {
     const credentialProfile = await getCredentialProfile("azure");
     console.log(`👉  Using Azure credential profile`, chalk.green(credentialProfile));
-    setCredentials("azure", credentialProfile);
+    setAzureCredentials(credentialProfile);
     getDefaultRegion("azure");
     await getRegion("azure");
 
-    // await fetchLowCPUInstancesAzure(); // This was commented out in your original code
+    const azureCredential = await getAzureCredentials();
+
+    // await fetchLowCPUInstancesAzure(azureCredential);
     await analyzeBlobUsage();
     await getAzureSQLStats();
     await analyzeDiskVolumes();

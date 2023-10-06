@@ -25,12 +25,12 @@ export const getAzureSQLStats = async (): Promise<AzureSQLStats[]> => {
       const databases = await sqlManagementClient.databases.listByServer(resourceGroupName, server.name!);
 
       for await (const database of databases) {
-        const dtuUsage: any = await sqlManagementClient.databases.get(resourceGroupName, server.name!, database.name!);
+        const dtuUsage = await sqlManagementClient.databases.get(resourceGroupName, server.name!, database.name!);
 
         sqlStats.push({
           serverName: server.name!,
           databaseName: database.name!,
-          dtuUsage: dtuUsage.databaseUsage!.currentValue!,
+          dtuUsage: dtuUsage.sku!.capacity!,
         });
       }
     }
