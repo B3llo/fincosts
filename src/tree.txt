@@ -1,0 +1,44 @@
+src
+├── config
+│   └── providers.ts
+├── enums
+│   └── availableProviders.enum.ts
+├── index.ts
+├── jest.config.js
+├── main.test.js
+├── types
+│   └── providerConfig.ts
+└── providers
+    ├── aws
+    │   ├── index.ts
+    │   ├── analysis
+    │   │   ├── index.ts
+    │   │   ├── lowUsageEC2.ts
+    │   │   ├── ... (outros arquivos .ts)
+    │   ├── tests
+    │   │   ├── index.test.ts
+    │   │   ├── lowUsageEC2.test.ts
+    │   │   ├── ... (outros arquivos .test.ts)
+    │   └── credentials.ts
+    ├── azure
+    │   ├── index.ts
+    │   ├── analysis
+    │   │   ├── index.ts
+    │   │   ├── lowCPUInstances.ts
+    │   │   ├── ... (outros arquivos .ts)
+    │   ├── tests
+    │   │   ├── index.test.ts
+    │   │   ├── analyzeBlobUsage.test.ts
+    │   │   ├── ... (outros arquivos .test.ts)
+    │   └── credentials.ts
+    └── gcp
+        ├── index.ts
+        ├── analysis
+        │   │   ├── index.ts
+        │   │   ├── lowUsageVMs.ts
+        │   │   ├── ... (outros arquivos .ts)
+        ├── tests
+        │   │   ├── index.test.ts
+        │   │   ├── checkCloudSQL.test.ts
+        │   │   ├── ... (outros arquivos .test.ts)
+        └── credentials.ts

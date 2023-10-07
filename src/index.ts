@@ -1,15 +1,14 @@
 import { AvailableProviders } from "./enums/availableProviders.enum";
-import { fetchUnattachedEBSVolumes, fetchLowCPUInstances, fetchUnattachedEIPs, fetchUnusedNatGateways, fetchUnattachedENIs, fetchOldSnapshots } from "./utils/aws/analysis";
-import { getCloudSQLStats, analyzeBucketUsage, fetchLowCPUInstancesGCP } from "./utils/gcp/analysis";
-import { fetchLowCPUInstancesAzure, analyzeBlobUsage, getAzureSQLStats, analyzeDiskVolumes } from "./utils/azure/analysis";
-import { listAvailableProfiles, readFincostsConfig, setCredentials, setRegion, getDefaultRegion } from "./utils/unifiedCredentials";
 import inquirer from "inquirer";
 import chalk from "chalk";
 import puppeteer from "puppeteer";
+import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import path from "path";
-import { getAzureCredentials, setAzureCredentials } from "./utils/azure/credentials";
+
+import { performAnalysis as performAWSAnalysis } from "./providers/aws";
+// import { performAnalysis as performGCPAnalysis } from "./providers/gcp";
+// import { performAnalysis as performAzureAnalysis } from "./providers/azure";
 
 function ensureFincostsFileExists() {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,59 +21,27 @@ function ensureFincostsFileExists() {
   }
 }
 
-export async function getProvider(): Promise<"aws" | "gcp" | "azure"> {
+export async function getProvider(): Promise<keyof typeof AvailableProviders> {
   const answer = await inquirer.prompt([
     {
       type: "list",
       name: "cloudProvider",
       message: "\nWhich cloud provider do you want to analyze?",
-      choices: Object.values(AvailableProviders), // Using the values directly
+      choices: Object.values(AvailableProviders),
     },
   ]);
-  return answer.cloudProvider.toLowerCase() as "aws" | "gcp" | "azure";
+  return answer.cloudProvider;
 }
 
-type AWSProfile = {
-  credentialsFile: Record<string, unknown>;
-};
-
-export async function getCredentialProfile(provider: "aws" | "gcp" | "azure"): Promise<string> {
-  const credentials = await listAvailableProfiles(provider);
-  let choices: string[] = [];
-
-  if (provider === "aws" && isAWSProfile(credentials)) {
-    choices = Object.keys(credentials.credentialsFile);
-  } else if (Array.isArray(credentials)) {
-    choices = credentials;
-  }
-
-  const answer = await inquirer.prompt([
+async function getDownloadReportPreference(): Promise<boolean> {
+  const answers = await inquirer.prompt([
     {
-      type: "list",
-      name: "credentialProfile",
-      message: `\nWhich ${provider.toUpperCase()} credential profile do you want to use?`, // Convert to uppercase for display
-      choices: choices,
+      type: "confirm",
+      name: "downloadReport",
+      message: "Would you like to download the analysis report?",
     },
   ]);
-
-  return answer.credentialProfile;
-}
-
-function isAWSProfile(credentials: any): credentials is AWSProfile {
-  return credentials && typeof credentials === "object" && "credentialsFile" in credentials;
-}
-
-export async function getRegion(provider: "aws" | "gcp" | "azure") {
-  const defaultRegion = readFincostsConfig(provider).defaultRegion;
-  const answer = await inquirer.prompt([
-    {
-      type: "input",
-      name: "region",
-      message: `\nWhich region do you want to use? (${defaultRegion})`,
-      default: defaultRegion,
-    },
-  ]);
-  setRegion(provider, answer.region);
+  return answers.downloadReport;
 }
 
 async function generateReport(data: { labels: any; values: any } | undefined) {
@@ -124,60 +91,6 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
   console.log("Report has been generated as AnalysisReport.pdf");
 }
 
-async function performAWSAnalysis() {
-  try {
-    const credentialProfile = await getCredentialProfile("aws");
-    console.log(`👉  Using AWS credential profile`, chalk.green(credentialProfile));
-    setCredentials("aws", credentialProfile);
-    getDefaultRegion("aws");
-    await getRegion("aws");
-
-    await fetchLowCPUInstances();
-    await fetchUnattachedEIPs();
-    await fetchUnusedNatGateways();
-    await fetchOldSnapshots();
-    await fetchUnattachedEBSVolumes();
-    await fetchUnattachedENIs();
-  } catch (error: any) {
-    console.error(chalk.red("Error with AWS analysis: ", error.message));
-  }
-}
-
-async function performGCPAnalysis() {
-  try {
-    const credentialProfile = await getCredentialProfile("gcp");
-    console.log(`👉  Using GCP credential profile`, chalk.green(credentialProfile));
-    setCredentials("gcp", credentialProfile);
-    getDefaultRegion("gcp");
-    await getRegion("gcp");
-
-    await getCloudSQLStats("5657281292773709007");
-    await analyzeBucketUsage();
-    await fetchLowCPUInstancesGCP();
-  } catch (error: any) {
-    console.error(chalk.red("Error with GCP analysis: ", error.message));
-  }
-}
-
-async function performAzureAnalysis() {
-  try {
-    const credentialProfile = await getCredentialProfile("azure");
-    console.log(`👉  Using Azure credential profile`, chalk.green(credentialProfile));
-    setAzureCredentials(credentialProfile);
-    getDefaultRegion("azure");
-    await getRegion("azure");
-
-    const azureCredential = await getAzureCredentials();
-
-    // await fetchLowCPUInstancesAzure(azureCredential);
-    await analyzeBlobUsage();
-    await getAzureSQLStats();
-    await analyzeDiskVolumes();
-  } catch (error: any) {
-    console.error(chalk.red("Error with Azure analysis: ", error.message));
-  }
-}
-
 (async () => {
   ensureFincostsFileExists();
   const provider = await getProvider();
@@ -188,41 +101,28 @@ async function performAzureAnalysis() {
   }
 
   console.log("👉  You selected", chalk.green(provider));
+  console.log("\n🧪", chalk.bold("Starting analysis..."));
 
   try {
-    const credentialProfile = await getCredentialProfile(provider);
-    console.log(`👉  Using ${provider} credential profile`, chalk.green(credentialProfile));
-    setCredentials(provider, credentialProfile);
-    getDefaultRegion(provider);
-    await getRegion(provider);
-    console.log("\n🧪", chalk.bold("Starting analysis..."));
-
     switch (provider) {
-      case "aws":
+      case AvailableProviders.AWS:
         await performAWSAnalysis();
         break;
-      case "gcp":
-        await performGCPAnalysis();
-        break;
-      case "azure":
-        await performAzureAnalysis();
-        break;
+      // case AvailableProviders.GCP:
+      //   await performGCPAnalysis();
+      //   break;
+      // case AvailableProviders.Azure:
+      //   await performAzureAnalysis();
+      //   break;
     }
 
-    const answers = await inquirer.prompt([
-      {
-        type: "confirm",
-        name: "downloadReport",
-        message: "Would you like to download the analysis report?",
-      },
-    ]);
+    const downloadReport = await getDownloadReportPreference();
 
-    const analysisData = {
-      labels: ["AWS", "GCP", "Azure"],
-      values: [5, 3, 7], // Will be updated with actual values in the future
-    };
-
-    if (answers.downloadReport) {
+    if (downloadReport) {
+      const analysisData = {
+        labels: ["AWS", "GCP", "Azure"],
+        values: [5, 3, 7], // Will be updated with actual values in the future
+      };
       await generateReport(analysisData);
     }
   } catch (error: any) {
