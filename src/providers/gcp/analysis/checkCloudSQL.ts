@@ -24,7 +24,7 @@ export async function getCloudSQLStats(instanceId: string) {
     },
     aggregation: {
       alignmentPeriod: {
-        seconds: 24 * 60 * 60, // one day
+        seconds: 24 * 60 * 60, // One Day
       },
       perSeriesAligner: "ALIGN_MEAN",
     },

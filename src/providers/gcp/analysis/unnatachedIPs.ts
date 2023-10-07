@@ -8,7 +8,7 @@ async function getCompute() {
   return google.compute("v1");
 }
 
-async function listUnattachedIPs() {
+export async function listUnattachedIPs() {
   const compute = await getCompute();
 
   const config = readFincostsConfig();

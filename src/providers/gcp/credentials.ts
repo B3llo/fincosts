@@ -2,7 +2,7 @@ import { GoogleAuth } from "google-auth-library";
 import * as fs from "fs";
 import * as os from "os";
 
-interface FincostsConfig {
+interface GCPFincostsConfig {
   defaultProfile?: string;
   defaultRegion?: string;
   misusedResources?: {
@@ -14,26 +14,26 @@ interface FincostsConfig {
 
 const FINCOSTS_FILE_PATH = `${os.homedir()}/.fincosts`;
 
-export const readFincostsConfig = (): FincostsConfig => {
+export const readFincostsConfig = (): GCPFincostsConfig => {
   let fileContents: string;
   try {
     fileContents = fs.readFileSync(FINCOSTS_FILE_PATH, { encoding: "utf-8" });
   } catch (err) {
     console.warn(`Could not read .fincosts file: ${err}`);
     return {
-      defaultRegion: "",
+      defaultRegion: "us-east1",
       defaultProfile: "",
       misusedResources: {},
     };
   }
 
-  let config: FincostsConfig;
+  let config: GCPFincostsConfig;
   try {
     config = JSON.parse(fileContents).gcp || {};
   } catch (err) {
     console.warn(`Could not parse .fincosts file: ${err}`);
     return {
-      defaultRegion: "",
+      defaultRegion: "us-east1",
       defaultProfile: "",
       misusedResources: {},
     };
@@ -42,7 +42,7 @@ export const readFincostsConfig = (): FincostsConfig => {
   return config;
 };
 
-function writeFincostsConfig(config: FincostsConfig) {
+function writeFincostsConfig(config: GCPFincostsConfig) {
   let globalConfig: any;
   try {
     globalConfig = JSON.parse(fs.readFileSync(FINCOSTS_FILE_PATH, { encoding: "utf-8" }));
@@ -65,7 +65,8 @@ export async function listAvailableProfiles(): Promise<string[]> {
 }
 
 export async function getDefaultRegion(profileName: string) {
-  return "us-east1";
+  const config = readFincostsConfig();
+  return config.defaultRegion || "us-east1";
 }
 
 export const setGCPCredentials = (profileName: string): void => {

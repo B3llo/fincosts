@@ -8,7 +8,7 @@ async function getCompute() {
   return google.compute("v1");
 }
 
-async function listUnattachedDisks() {
+export async function listUnattachedDisks() {
   const compute = await getCompute();
 
   const config = readFincostsConfig();
