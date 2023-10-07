@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 
 import { performAnalysis as performAWSAnalysis } from "./providers/aws";
 // import { performAnalysis as performGCPAnalysis } from "./providers/gcp";
-// import { performAnalysis as performAzureAnalysis } from "./providers/azure";
+import { performAnalysis as performAzureAnalysis } from "./providers/azure";
 
 function ensureFincostsFileExists() {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
