@@ -5,10 +5,35 @@ import puppeteer from "puppeteer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 
 import { performAnalysis as performAWSAnalysis } from "./providers/aws";
 // import { performAnalysis as performGCPAnalysis } from "./providers/gcp";
 import { performAnalysis as performAzureAnalysis } from "./providers/azure";
+import { setAWSCredentials } from "./providers/aws/credentials";
+
+const argv: any = yargs(hideBin(process.argv))
+  .option("provider", {
+    alias: "c",
+    description: "Specify the cloud provider",
+    type: "string",
+    demandOption: true,
+  })
+  .option("profile", {
+    alias: "p",
+    description: "Specify the profile",
+    type: "string",
+    demandOption: true,
+  })
+  .option("generate-report", {
+    alias: "r",
+    description: "Generate a report",
+    type: "boolean",
+    default: false,
+  })
+  .help()
+  .alias("help", "h").argv;
 
 function ensureFincostsFileExists() {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -45,38 +70,69 @@ async function getDownloadReportPreference(): Promise<boolean> {
 }
 
 async function generateReport(data: { labels: any; values: any } | undefined) {
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-
   const content = `
     <html>
       <head>
+        <title>Analysis Report</title>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+          }
+          .chart-container {
+            width: 400px;
+            height: 400px;
+            margin: auto;
+          }
+        </style>
       </head>
       <body>
-        <h1>Analysis Report</h1>
-        <div id="chart-div" style="width:400px; height:400px;"></div>
+        <h1 style="text-align: center;">Analysis Report</h1>
+        
+        <h2>Resource Distribution</h2>
+        <div id="pie-chart-div" class="chart-container"></div>
+
+        <h2>Number of Instances</h2>
+        <div id="bar-chart-div" class="chart-container"></div>
+
       </body>
       <script>
-        // Initialize Chart.js here
-        const ctx = document.getElementById('chart-div').getContext('2d');
-        const myChart = new Chart(ctx, {
-          type: 'bar', // or 'line', 'pie', etc.
+        const pieCtx = document.getElementById('pie-chart-div').getContext('2d');
+        const barCtx = document.getElementById('bar-chart-div').getContext('2d');
+
+        new Chart(pieCtx, {
+          type: 'pie',
+          data: {
+            labels: ${JSON.stringify(data?.labels)},
+            datasets: [{
+              data: ${JSON.stringify(data?.values)},
+              backgroundColor: ['rgba(255, 99, 132, 0.5)', 'rgba(75, 192, 192, 0.5)', 'rgba(255, 205, 86, 0.5)'],
+              borderColor: ['rgba(255, 99, 132, 1)', 'rgba(75, 192, 192, 1)', 'rgba(255, 205, 86, 1)'],
+              borderWidth: 1
+            }]
+          },
+          options: {
+            animation: {
+                duration: 0
+            }
+          }
+        });
+
+        new Chart(barCtx, {
+          type: 'bar',
           data: {
             labels: ${JSON.stringify(data?.labels)},
             datasets: [{
               label: '# of Instances',
               data: ${JSON.stringify(data?.values)},
-              backgroundColor: 'rgba(75, 192, 192, 0.2)',
-              borderColor: 'rgba(75, 192, 192, 1)',
+              backgroundColor: ['rgba(255, 99, 132, 0.5)', 'rgba(75, 192, 192, 0.5)', 'rgba(255, 205, 86, 0.5)'],
+              borderColor: ['rgba(255, 99, 132, 1)', 'rgba(75, 192, 192, 1)', 'rgba(255, 205, 86, 1)'],
               borderWidth: 1
             }]
           },
           options: {
-            scales: {
-              y: {
-                beginAtZero: true
-              }
+            animation: {
+                duration: 0
             }
           }
         });
@@ -84,16 +140,32 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
     </html>
   `;
 
-  await page.setContent(content);
-  await page.pdf({ path: "AnalysisReport.pdf", format: "A4" });
+  fs.writeFileSync("report.html", content);
+
+  // Launch Puppeteer in headless mode
+  const browser = await puppeteer.launch();
+  const page = await browser.newPage();
+
+  // Navigate to the HTML file
+  await page.goto(`file://${path.resolve("report.html")}`, { waitUntil: "networkidle0" });
+
+  // Generate the PDF
+  const pdf = await page.pdf({
+    format: "A4",
+    path: "report.pdf",
+    printBackground: true,
+  });
 
   await browser.close();
-  console.log("Report has been generated as AnalysisReport.pdf");
+  console.log("Report has been generated as FinCosts_Analysis_Report.pdf");
 }
 
 (async () => {
   ensureFincostsFileExists();
-  const provider = await getProvider();
+  const provider = argv.provider || (await getProvider());
+  const profile = argv.profile;
+
+  profile != null && setAWSCredentials(profile);
 
   if (!Object.values(AvailableProviders).includes(provider)) {
     console.log("\n😞 Sorry, we currently do not support this provider");
@@ -106,6 +178,7 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
   try {
     switch (provider) {
       case AvailableProviders.AWS:
+        profile != null ? await performAWSAnalysis(false) : await performAWSAnalysis(true);
         await performAWSAnalysis();
         break;
       // case AvailableProviders.GCP:
@@ -116,12 +189,12 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
       //   break;
     }
 
-    const downloadReport = await getDownloadReportPreference();
+    const downloadReport: boolean = argv["generate-report"] || (await getDownloadReportPreference());
 
     if (downloadReport) {
       const analysisData = {
-        labels: ["AWS", "GCP", "Azure"],
-        values: [5, 3, 7], // Will be updated with actual values in the future
+        labels: ["Low Usage EC2", "Old EBS Snapshots", "Unattached EBS Volumes", "Unattached EIP", "Unattached ENI", "Unused Load Balancers", "Unused NAT Gateways"],
+        values: [10, 15, 8, 5, 7, 2, 3],
       };
       await generateReport(analysisData);
     }

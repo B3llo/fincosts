@@ -1,15 +1,14 @@
 import { setAWSCredentials, setAWSRegion, getDefaultRegion, listAvailableProfiles } from "./credentials";
 import { fetchUnattachedEBSVolumes, fetchLowCPUInstances, fetchUnattachedEIPs, fetchUnusedNatGateways, fetchUnattachedENIs, fetchOldSnapshots } from "./analysis";
 
-export async function performAnalysis() {
+export async function performAnalysis(askCredential?: boolean) {
   try {
-    const credentialProfile = await listAvailableProfiles();
-
-    setAWSCredentials(credentialProfile);
-
-    const defaultRegion = await getDefaultRegion(credentialProfile);
-
-    setAWSRegion(defaultRegion);
+    if (askCredential) {
+      const credentialProfile = await listAvailableProfiles();
+      setAWSCredentials(credentialProfile);
+      const defaultRegion = await getDefaultRegion(credentialProfile);
+      setAWSRegion(defaultRegion);
+    }
 
     await fetchLowCPUInstances();
     await fetchUnattachedEIPs();
