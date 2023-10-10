@@ -1,5 +1,5 @@
 import { setAWSCredentials, setAWSRegion, getDefaultRegion, listAvailableProfiles } from "./credentials";
-import { fetchUnattachedEBSVolumes, fetchLowCPUInstances, fetchUnattachedEIPs, fetchUnusedNatGateways, fetchUnattachedENIs, fetchOldSnapshots } from "./analysis";
+import { fetchUnattachedEBSVolumes, fetchLowCPUInstances, fetchUnattachedEIPs, fetchUnusedNatGateways, fetchUnattachedENIs, fetchOldSnapshots, fetchUnusedIPv4s } from "./analysis";
 
 export async function performAnalysis(askCredential?: boolean) {
   try {
@@ -16,6 +16,7 @@ export async function performAnalysis(askCredential?: boolean) {
     await fetchOldSnapshots();
     await fetchUnattachedEBSVolumes();
     await fetchUnattachedENIs();
+    await fetchUnusedIPv4s();
   } catch (error: any) {
     console.error("Error with AWS analysis: ", error.message);
   }
