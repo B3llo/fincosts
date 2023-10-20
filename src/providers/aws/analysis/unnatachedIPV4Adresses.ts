@@ -21,8 +21,6 @@ export const fetchUnusedIPv4s = async (): Promise<UnusedIPv4[]> => {
 
     addresses = addresses.filter((addr) => addr.AssociationId === undefined);
 
-    console.log("addresses", addresses);
-
     const unusedIPv4s: UnusedIPv4[] = (addresses || []).map((addr) => ({
       publicIp: addr.PublicIp || "",
       allocationId: addr.AllocationId || "",

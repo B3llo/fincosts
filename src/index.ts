@@ -142,14 +142,11 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
 
   fs.writeFileSync("report.html", content);
 
-  // Launch Puppeteer in headless mode
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
 
-  // Navigate to the HTML file
   await page.goto(`file://${path.resolve("report.html")}`, { waitUntil: "networkidle0" });
 
-  // Generate the PDF
   const pdf = await page.pdf({
     format: "A4",
     path: "report.pdf",
