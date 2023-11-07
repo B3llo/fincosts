@@ -214,10 +214,31 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
   console.log("Report has been generated as FinCosts_Analysis_Report.pdf");
 }
 
+function calculateSavings(analysisData: { unusedEC2Instances: number; unusedEBSVolumes: number }, resourceCosts: { EC2: { unusedInstance: number }; EBS: { unusedVolume: number } }) {
+  let totalSavings = 0;
+
+  if (analysisData.unusedEC2Instances) {
+    totalSavings += analysisData.unusedEC2Instances * resourceCosts.EC2.unusedInstance;
+  }
+
+  if (analysisData.unusedEBSVolumes) {
+    totalSavings += analysisData.unusedEBSVolumes * resourceCosts.EBS.unusedVolume;
+  }
+
+  return totalSavings.toFixed(2);
+}
+
 (async () => {
   ensureFincostsFileExists();
   const provider = argv.provider || (await getProvider());
   const profile = argv.profile;
+
+  const resourceCosts: any = {
+    AWS: {
+      EC2: { unusedInstance: 30 },
+      EBS: { unusedVolume: 10 },
+    },
+  };
 
   profile != null && setAWSCredentials(profile);
 
@@ -230,8 +251,10 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
   console.log("\n🧪", chalk.bold("Starting analysis..."));
 
   try {
+    let analysisData: any;
     switch (provider) {
       case AvailableProviders.AWS:
+        analysisData = await performAWSAnalysis();
         profile != null ? await performAWSAnalysis(false) : await performAWSAnalysis(true);
         break;
       // case AvailableProviders.GCP:
@@ -240,6 +263,13 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
       // case AvailableProviders.Azure:
       //   await performAzureAnalysis();
       //   break;
+      default:
+        throw new Error("Unsupported provider");
+    }
+
+    if (analysisData) {
+      const savings = calculateSavings(analysisData, resourceCosts[provider]);
+      console.log(`💰 Potential savings: $${savings}/month`);
     }
 
     const downloadReport: boolean = argv["generate-report"] || argv["no-report"] || (await getDownloadReportPreference());
