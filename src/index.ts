@@ -13,6 +13,8 @@ import { performAnalysis as performAWSAnalysis } from "./providers/aws";
 import { performAnalysis as performAzureAnalysis } from "./providers/azure";
 import { setAWSCredentials } from "./providers/aws/credentials";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const argv: any = yargs(hideBin(process.argv))
   .option("provider", {
     alias: "c",
@@ -42,7 +44,7 @@ const argv: any = yargs(hideBin(process.argv))
   .alias("help", "h").argv;
 
 function ensureFincostsFileExists() {
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const __dirname = path.dirname(fileURLToPath(new URL(".", import.meta.url)));
   const fincostsPath = path.join(__dirname, ".fincosts");
 
   console.log(`Looking for .fincosts file at: ${fincostsPath}`);
@@ -72,12 +74,14 @@ async function getDownloadReportPreference(): Promise<boolean> {
       message: "Would you like to download the analysis report?",
     },
   ]);
+
   return answers.downloadReport;
 }
 
 async function generateReport(data: { labels: any; values: any } | undefined) {
+  // Generate the report content with chart.js integration
   const content = `
-    <html>
+   <html>
       <head>
       <title>Detailed Analysis Report</title>
       <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -111,7 +115,7 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
     </head>
     <body>
       <h1>Detailed Analysis Report</h1>
-      
+
       <div class="chart-container">
         <h2>Resource Distribution</h2>
         <canvas id="pie-chart-div"></canvas>
@@ -196,25 +200,34 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
     </html>
   `;
 
-  fs.writeFileSync("report.html", content);
+  const filePath = path.join(__dirname, "report.html");
+  fs.writeFileSync(filePath, content);
 
   const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
   const page = await browser.newPage();
   await page.setViewport({ width: 1200, height: 800 });
-  await page.goto(`file://${path.resolve("report.html")}`, { waitUntil: "networkidle0" });
-  await page.waitForTimeout(3000); // Adicionando um delay para garantir que todos os gráficos sejam renderizados
 
-  const pdf = await page.pdf({
+  await page.goto(`file://${filePath}`, { waitUntil: "networkidle0" });
+
+  await page.waitForFunction(() => {
+    const chartElements = document.querySelectorAll("canvas");
+    return Array.from(chartElements).every((chart) => chart.offsetHeight > 0 && chart.offsetWidth > 0);
+  });
+
+  await page.pdf({
+    path: "AnalysisReport.pdf",
     format: "A4",
-    path: "report.pdf",
     printBackground: true,
   });
 
   await browser.close();
-  console.log("Report has been generated as FinCosts_Analysis_Report.pdf");
+  console.log("Report has been generated as AnalysisReport.pdf");
 }
 
-function calculateSavings(analysisData: { unusedEC2Instances: number; unusedEBSVolumes: number }, resourceCosts: { EC2: { unusedInstance: number }; EBS: { unusedVolume: number } }) {
+function calculateSavings(
+  analysisData: { unusedEC2Instances: number; unusedEBSVolumes: number },
+  resourceCosts: { EC2: { unusedInstance: number }; EBS: { unusedVolume: number } }
+) {
   let totalSavings = 0;
 
   if (analysisData.unusedEC2Instances) {
@@ -280,7 +293,15 @@ function calculateSavings(analysisData: { unusedEC2Instances: number; unusedEBSV
 
     if (downloadReport && !argv["no-report"]) {
       const analysisData = {
-        labels: ["Low Usage EC2", "Old EBS Snapshots", "Unattached EBS Volumes", "Unattached EIP", "Unattached ENI", "Unused Load Balancers", "Unused NAT Gateways"],
+        labels: [
+          "Low Usage EC2",
+          "Old EBS Snapshots",
+          "Unattached EBS Volumes",
+          "Unattached EIP",
+          "Unattached ENI",
+          "Unused Load Balancers",
+          "Unused NAT Gateways",
+        ],
         values: [10, 15, 8, 5, 7, 2, 3],
       };
       await generateReport(analysisData);
