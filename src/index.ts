@@ -81,12 +81,29 @@ async function getDownloadReportPreference(): Promise<boolean> {
 }
 
 async function generateReport(data: any): Promise<void> {
-  console.log(JSON.stringify(data));
+  console.log(data.costEffects.map((effect: any) => effect.type)); // Should log an array of labels (strings)
+  console.log(data.costEffects.map((effect: any) => effect.costEffect)); // Should log an array of numbers
 
   const filteredChartData = data.values.map((item: any) => ({ label: item.type, count: item.data.length })).filter((item: any) => item.count > 0);
 
+  const resourceDetails = data.values
+    .map((item: any) => {
+      const regex = /[a-zA-Z0-9]+-[a-zA-Z0-9]+|\d+\.\d+\.\d+\.\d+/;
+      const ids = item.data
+        .map((i: any) => i.instanceId || i.publicIp || i.allocationId || i)
+        .filter((id: any) => regex.test(id))
+        .join("<br>");
+
+      return ids.length > 0 ? `<strong>${item.type}:</strong><br>${ids}` : "";
+    })
+    .filter((detail: string) => detail.length > 0)
+    .join("<br>");
+
   const labels = filteredChartData.map((item: any) => item.label);
   const counts = filteredChartData.map((item: any) => item.count);
+  const polarLabels = data.costEffects.map((effect: any) => effect.type);
+  const polarcostEffects = data.costEffects.map((effect: any) => effect.costEffect);
+
   const content = `
       <!DOCTYPE html>
       <html lang="en">
@@ -148,8 +165,8 @@ async function generateReport(data: any): Promise<void> {
               text-align: center;
               color: #28a745;
               font-weight: bold;
-              padding: 20px;
-              margin-top: 30px;
+              padding: 10px;
+              margin-top: 10px;
               background-color: #e8f5e9;
               border-radius: 8px;
               box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
@@ -167,25 +184,34 @@ async function generateReport(data: any): Promise<void> {
         </head>
         <body>
           <div class="container">
-            <h1>Detailed Analysis Report</h1>
-            <div class="chart-container">
-              <div class="chart-box">
-                <h2>Unused Resources</h2>
-                <canvas id="pie-chart"></canvas>
-              </div>
-              <div class="chart-box">
-                <h2>Instances Count</h2>
-                <canvas id="bar-chart"></canvas>
-              </div>
-              <div class="chart-box">
-                <h2>Data Analysis</h2>
-                <canvas id="polar-chart"></canvas>
-              </div>
+          <h1>Detailed Analysis Report</h1>
+
+          <div class="chart-container">
+            <div class="chart-box">
+              <h2>Unused Resources</h2>
+              <canvas id="pie-chart"></canvas>
             </div>
-            <div class="savings-highlight">
-              💰 Potential Savings: <strong>$1 Billion/month</strong>
+           
+            <div class="chart-box">
+              <h2>Resources Count</h2>
+              <canvas id="bar-chart"></canvas>
+            </div>
+
+            <div class="chart-box">
+              <h2>Costs Mapping</h2>
+              <canvas id="polar-chart"></canvas>
+            </div>
+
+            <div class="chart-box">
+              <h2>Resource Details</h2>
+              <div>${resourceDetails}</div>
             </div>
           </div>
+          
+          <div class="savings-highlight">
+            &#x1F4B0; Potential Savings: <strong> (~) $${data.potencialSavings}/monthly</strong>
+          </div>
+        </div>
 
           <script>
             const pieChartCtx = document.getElementById('pie-chart').getContext('2d');
@@ -222,6 +248,7 @@ async function generateReport(data: any): Promise<void> {
                 labels: ${JSON.stringify(labels)},
                 datasets: [{
                   data: ${JSON.stringify(counts)},
+                  label: '',
                   backgroundColor: colors,
                   borderColor: colors.map((color) => color.replace('0.6', '1')),
                   borderWidth: 1
@@ -235,15 +262,15 @@ async function generateReport(data: any): Promise<void> {
             new Chart(polarChartCtx, {
               type: 'polarArea',
               data: {
-                labels: ${JSON.stringify(labels)},
+                labels: ${JSON.stringify(polarLabels)},
                 datasets: [{
-                  data: ${JSON.stringify(counts)},
+                  data: ${JSON.stringify(polarcostEffects)},
                   backgroundColor: colors,
-                  borderColor: colors.map((color) => color.replace('0.6', '1')),
+                  borderColor: colors.map(color => color.replace('0.6', '1')),
                   borderWidth: 1
                 }]
               }
-            });
+            });        
           </script>
         </body>
       </html>
@@ -271,23 +298,6 @@ async function generateReport(data: any): Promise<void> {
 
   await browser.close();
   console.log("Report has been generated as AnalysisReport.pdf");
-}
-
-function calculateSavings(
-  analysisData: { unusedEC2Instances: number; unusedEBSVolumes: number },
-  resourceCosts: { EC2: { unusedInstance: number }; EBS: { unusedVolume: number } }
-) {
-  let totalSavings = 0;
-
-  if (analysisData.unusedEC2Instances) {
-    totalSavings += analysisData.unusedEC2Instances * resourceCosts.EC2.unusedInstance;
-  }
-
-  if (analysisData.unusedEBSVolumes) {
-    totalSavings += analysisData.unusedEBSVolumes * resourceCosts.EBS.unusedVolume;
-  }
-
-  return totalSavings.toFixed(2);
 }
 
 (async () => {
@@ -326,11 +336,8 @@ function calculateSavings(
     }
 
     if (downloadReport) {
-      const reportData = {
-        labels: analysisData.labels,
-        values: analysisData.values,
-      };
-      await generateReport(reportData);
+      console.log(analysisData);
+      await generateReport(analysisData);
     }
   } catch (error: any) {
     console.log(chalk.red("\n✖", error.message));

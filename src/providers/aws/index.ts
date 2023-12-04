@@ -9,6 +9,43 @@ import {
   fetchUnusedIPv4s,
 } from "./analysis";
 
+const resourceCosts = {
+  LowCPUInstances: 0.24,
+  UnattachedEIPs: 0.005,
+  UnusedNatGateways: 0.045,
+  OldSnapshots: 0.01,
+  UnattachedEBSVolumes: 0.1,
+  UnattachedENIs: 0.005,
+  UnusedIPv4s: 0.004,
+};
+
+function calculateSavings(analysisData: any, resourceCosts: any) {
+  let totalSavings = 0;
+
+  analysisData.values.forEach((item: any) => {
+    const resourceType = item.type;
+    const costPerHour = resourceCosts[resourceType];
+    if (costPerHour) {
+      totalSavings += item.data.length * costPerHour * 24 * 30; // Cálculo para um mês
+    }
+  });
+
+  return totalSavings.toFixed(2);
+}
+
+function calculateCostEffect(analysisResults: any, resourceCosts: any) {
+  return analysisResults.map((item: any) => {
+    const resourceType = item.type;
+    const count = item.data.length;
+    const costPerUnit = resourceCosts[resourceType] || 0;
+    const totalCostEffect = count * costPerUnit;
+    return {
+      type: resourceType,
+      costEffect: totalCostEffect,
+    };
+  });
+}
+
 export async function performAnalysis(askCredential?: boolean) {
   let analysisResults: any[] = [];
 
@@ -30,10 +67,17 @@ export async function performAnalysis(askCredential?: boolean) {
 
     const labels = analysisResults.map((item) => item.type);
 
+    const costEffects = calculateCostEffect(analysisResults, resourceCosts);
+
     const analysisData = {
-      labels: labels,
+      labels: analysisResults.map((item) => item.type),
       values: analysisResults,
+      costEffects: costEffects,
+      potencialSavings: 0,
     };
+
+    let totalSavings = calculateSavings(analysisData, resourceCosts);
+    analysisData.potencialSavings = Number(totalSavings);
 
     return analysisData;
   } catch (error: any) {
