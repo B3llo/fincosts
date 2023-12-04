@@ -80,7 +80,13 @@ async function getDownloadReportPreference(): Promise<boolean> {
   return answers.downloadReport;
 }
 
-async function generateReport(data: { labels: any; values: any } | undefined) {
+async function generateReport(data: any): Promise<void> {
+  console.log(JSON.stringify(data));
+
+  const filteredChartData = data.values.map((item: any) => ({ label: item.type, count: item.data.length })).filter((item: any) => item.count > 0);
+
+  const labels = filteredChartData.map((item: any) => item.label);
+  const counts = filteredChartData.map((item: any) => item.count);
   const content = `
       <!DOCTYPE html>
       <html lang="en">
@@ -88,180 +94,159 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Detailed Analysis Report</title>
+          <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
           <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
           <style>
             * {
               box-sizing: border-box;
-            }
-            body {
-              font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
               margin: 0;
               padding: 0;
+            }
+            body {
+              font-family: 'Roboto', sans-serif;
               background: #f7f7f7;
               color: #333;
+              line-height: 1.6;
             }
             .container {
               max-width: 1200px; 
-              margin: 10px auto;
-              background: white;
+              margin: 20px auto;
               padding: 20px;
+              background: #fff;
               box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
               border-radius: 8px;
             }
             h1 {
               text-align: center;
-              color: #0275d8;
-              margin-bottom: 40px;
+              color: #333;
+              margin-bottom: 20px;
             }
             .chart-container {
-              display: grid;
-              grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+              display: flex;
+              flex-wrap: wrap;
+              justify-content: space-around;
               gap: 20px;
-              align-items: start;
-              justify-content: center; 
             }
             .chart-box {
-              width: 100%;
+              flex: 1;
+              min-width: 300px;
               padding: 20px;
+              background: #f4f4f4;
+              border-radius: 8px;
+              box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
             }
             h2 {
-              color: #333;
-              margin-bottom: 15px;
-              font-size: 1.5em;
+              margin-bottom: 10px;
+              text-align: center;
+              color: #0275d8;
             }
             canvas {
-              width: 100%;
+              display: block;
               max-width: 100%;
-              height: auto;
-              margin: auto;
             }
             .savings-highlight {
-              font-size: 1em;
+              text-align: center;
               color: #28a745;
               font-weight: bold;
               padding: 20px;
-              border-radius: 8px;
+              margin-top: 30px;
               background-color: #e8f5e9;
-              margin: 20px auto;
-              width: fit-content;
+              border-radius: 8px;
+              box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
             }
-            .savings-icon {
-              font-size: 1em;
-            }
-            @media (max-width: 768px) {
-              .chart-box {
-                max-width: 100%;
+            @media screen and (max-width: 768px) {
+              .chart-container {
+                flex-direction: column;
+                align-items: center;
               }
-            }
-            .savings-highlight {
-              font-size: 2.5em;
-              text-align: center;
-              margin: 20px 0;
+              .chart-box {
+                width: 90%;
+              }
             }
           </style>
         </head>
         <body>
           <div class="container">
             <h1>Detailed Analysis Report</h1>
-                    <div class="chart-container">
+            <div class="chart-container">
               <div class="chart-box">
-                <h2>Unused Resources Distribution</h2>
-                <canvas id="pie-chart-div"></canvas>
+                <h2>Unused Resources</h2>
+                <canvas id="pie-chart"></canvas>
               </div>
               <div class="chart-box">
-                <h2>Number of Instances</h2>
-                <canvas id="bar-chart-div"></canvas>
+                <h2>Instances Count</h2>
+                <canvas id="bar-chart"></canvas>
               </div>
               <div class="chart-box">
-                <h2>Usage Analysis</h2>
-                <canvas id="line-chart-div"></canvas>
-              </div>
-              <div class="chart-box">
-                <h2>Additional Data Analysis</h2>
-                <canvas id="additional-chart-div"></canvas>
+                <h2>Data Analysis</h2>
+                <canvas id="polar-chart"></canvas>
               </div>
             </div>
-
             <div class="savings-highlight">
-              <span class="savings-icon">💰</span> Potential Savings: <strong>$1 Billion/month</strong>
+              💰 Potential Savings: <strong>$1 Billion/month</strong>
             </div>
+          </div>
 
-        <script>
-          const pieCtx = document.getElementById('pie-chart-div').getContext('2d');
-          const barCtx = document.getElementById('bar-chart-div').getContext('2d');
-          const lineCtx = document.getElementById('line-chart-div').getContext('2d');
-          const additionalCtx = document.getElementById('additional-chart-div').getContext('2d');
+          <script>
+            const pieChartCtx = document.getElementById('pie-chart').getContext('2d');
+            const barChartCtx = document.getElementById('bar-chart').getContext('2d');
+            const polarChartCtx = document.getElementById('polar-chart').getContext('2d');
 
-          const colors = [
-            'rgba(255, 99, 132, 0.5)',
-            'rgba(54, 162, 235, 0.5)',
-            'rgba(255, 206, 86, 0.5)',
-            'rgba(75, 192, 192, 0.5)',
-            'rgba(153, 102, 255, 0.5)',
-            'rgba(255, 159, 64, 0.5)',
-            'rgba(100, 200, 100, 0.5)',
-            'rgba(200, 100, 200, 0.5)',
-          ];
+            const colors = [
+              'rgba(255, 99, 132, 0.6)',
+              'rgba(54, 162, 235, 0.6)',
+              'rgba(255, 206, 86, 0.6)',
+              'rgba(75, 192, 192, 0.6)',
+              'rgba(153, 102, 255, 0.6)',
+              'rgba(255, 159, 64, 0.6)',
+              'rgba(100, 200, 100, 0.6)',
+              'rgba(200, 100, 200, 0.6)',
+            ];
 
-          const borderColor = colors.map(color => color.replace('0.5', '1'));
+            new Chart(pieChartCtx, {
+              type: 'pie',
+              data: {
+                labels: ${JSON.stringify(labels)},
+                datasets: [{
+                  data: ${JSON.stringify(counts)},
+                  backgroundColor: colors,
+                  borderColor: colors.map((color) => color.replace('0.6', '1')),
+                  borderWidth: 1
+                }]
+              }
+            });
 
+            new Chart(barChartCtx, {
+              type: 'bar',
+              data: {
+                labels: ${JSON.stringify(labels)},
+                datasets: [{
+                  data: ${JSON.stringify(counts)},
+                  backgroundColor: colors,
+                  borderColor: colors.map((color) => color.replace('0.6', '1')),
+                  borderWidth: 1
+                }]
+              },
+              options: {
+                indexAxis: 'y',
+              }
+            });
 
-          new Chart(pieCtx, {
-            type: 'bar',
-            data: {
-              labels: ${JSON.stringify(data?.labels)},
-              datasets: [{
-                data: ${JSON.stringify(data?.values)},
-                backgroundColor: colors,
-                borderColor: borderColor,
-                borderWidth: 1
-              }]
-            }
-          });
-
-          new Chart(barCtx, {
-            type: 'bar',
-            data: {
-              labels: ${JSON.stringify(data?.labels)},
-              datasets: [{
-                label: '# of Instances',
-                data: ${JSON.stringify(data?.values)},
-                backgroundColor: colors,
-                borderColor: borderColor,
-                borderWidth: 1
-              }]
-            }
-          });
-
-          new Chart(lineCtx, {
-            type: 'line',
-            data: {
-              labels: ${JSON.stringify(data?.labels)},
-              datasets: [{
-                label: 'Tendência de Uso',
-                data: ${JSON.stringify(data?.values)},
-                borderColor: 'rgba(75, 192, 192, 1)',
-                fill: true,
-              }]
-            }
-          });
-
-          new Chart(additionalCtx, {
-            type: 'radar',
-            data: {
-              labels: ${JSON.stringify(data?.labels)},
-              datasets: [{
-                data: ${JSON.stringify(data?.values)},
-                backgroundColor: ['rgba(153, 102, 255, 0.5)', 'rgba(255, 159, 64, 0.5)'],
-                borderColor: ['rgba(153, 102, 255, 1)', 'rgba(255, 159, 64, 1)'],
-                borderWidth: 1
-              }]
-            }
-          });
-
-        </script>
-      </body>
-    </html>
+            new Chart(polarChartCtx, {
+              type: 'polarArea',
+              data: {
+                labels: ${JSON.stringify(labels)},
+                datasets: [{
+                  data: ${JSON.stringify(counts)},
+                  backgroundColor: colors,
+                  borderColor: colors.map((color) => color.replace('0.6', '1')),
+                  borderWidth: 1
+                }]
+              }
+            });
+          </script>
+        </body>
+      </html>
   `;
 
   const filePath = path.join(__dirname, "report.html");
@@ -269,7 +254,7 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
 
   const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
   const page = await browser.newPage();
-  await page.setViewport({ width: 1250, height: 1850 });
+  await page.setViewport({ width: 1250, height: 1900 });
 
   await page.goto(`file://${filePath}`, { waitUntil: "networkidle0" });
 
@@ -329,7 +314,6 @@ function calculateSavings(
       case AvailableProviders.GCP:
         break;
       case AvailableProviders.Azure:
-        await performAzureAnalysis();
         break;
       default:
         throw new Error("Unsupported provider");
@@ -343,8 +327,8 @@ function calculateSavings(
 
     if (downloadReport) {
       const reportData = {
-        labels: ["EC2 Instances", "EBS Snapshots", "EBS Volumes", "EIP", "ENI", "Load Balancers", "NAT Gateways"],
-        values: [10, 15, 8, 5, 7, 2, 3],
+        labels: analysisData.labels,
+        values: analysisData.values,
       };
       await generateReport(reportData);
     }
