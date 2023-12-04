@@ -31,12 +31,14 @@ const argv: any = yargs(hideBin(process.argv))
   .option("generate-report", {
     alias: "r",
     description: "Generate a report",
+    demandOption: false,
     type: "boolean",
     default: false,
   })
   .option("no-report", {
     alias: "r",
     description: "Do not generate a report",
+    demandOption: false,
     type: "boolean",
     default: false,
   })
@@ -79,62 +81,110 @@ async function getDownloadReportPreference(): Promise<boolean> {
 }
 
 async function generateReport(data: { labels: any; values: any } | undefined) {
-  // Generate the report content with chart.js integration
   const content = `
-   <html>
+      <!DOCTYPE html>
+      <html lang="en">
       <head>
-      <title>Detailed Analysis Report</title>
-      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-      <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        .chart-container {
-            width: 80%;
-            height: 400px;
-            margin: 20px auto;
-        }
-        h1, h2 {
-            text-align: center;
-            color: #333;
-        }
-        table {
-            width: 80%;
-            margin: 20px auto;
-            border-collapse: collapse;
-        }
-        table, th, td {
-            border: 1px solid black;
-        }
-        th, td {
-            padding: 10px;
-            text-align: left;
-        }
-      </style>
-    </head>
-    <body>
-      <h1>Detailed Analysis Report</h1>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Detailed Analysis Report</title>
+          <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+          <style>
+            * {
+              box-sizing: border-box;
+            }
+            body {
+              font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+              margin: 0;
+              padding: 0;
+              background: #f7f7f7;
+              color: #333;
+            }
+            .container {
+              max-width: 1200px; 
+              margin: 10px auto;
+              background: white;
+              padding: 20px;
+              box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+              border-radius: 8px;
+            }
+            h1 {
+              text-align: center;
+              color: #0275d8;
+              margin-bottom: 40px;
+            }
+            .chart-container {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+              gap: 20px;
+              align-items: start;
+              justify-content: center; 
+            }
+            .chart-box {
+              width: 100%;
+              padding: 20px;
+            }
+            h2 {
+              color: #333;
+              margin-bottom: 15px;
+              font-size: 1.5em;
+            }
+            canvas {
+              width: 100%;
+              max-width: 100%;
+              height: auto;
+              margin: auto;
+            }
+            .savings-highlight {
+              font-size: 1em;
+              color: #28a745;
+              font-weight: bold;
+              padding: 20px;
+              border-radius: 8px;
+              background-color: #e8f5e9;
+              margin: 20px auto;
+              width: fit-content;
+            }
+            .savings-icon {
+              font-size: 1em;
+            }
+            @media (max-width: 768px) {
+              .chart-box {
+                max-width: 100%;
+              }
+            }
+            .savings-highlight {
+              font-size: 2.5em;
+              text-align: center;
+              margin: 20px 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Detailed Analysis Report</h1>
+                    <div class="chart-container">
+              <div class="chart-box">
+                <h2>Unused Resources Distribution</h2>
+                <canvas id="pie-chart-div"></canvas>
+              </div>
+              <div class="chart-box">
+                <h2>Number of Instances</h2>
+                <canvas id="bar-chart-div"></canvas>
+              </div>
+              <div class="chart-box">
+                <h2>Usage Analysis</h2>
+                <canvas id="line-chart-div"></canvas>
+              </div>
+              <div class="chart-box">
+                <h2>Additional Data Analysis</h2>
+                <canvas id="additional-chart-div"></canvas>
+              </div>
+            </div>
 
-      <div class="chart-container">
-        <h2>Resource Distribution</h2>
-        <canvas id="pie-chart-div"></canvas>
-      </div>
-
-      <div class="chart-container">
-        <h2>Number of Instances</h2>
-        <canvas id="bar-chart-div"></canvas>
-      </div>
-
-      <div class="chart-container">
-        <h2>Usage Analysis</h2>
-        <canvas id="line-chart-div"></canvas>
-      </div>
-
-      <div class="chart-container">
-        <h2>Additional Data Analysis</h2>
-        <canvas id="additional-chart-div">s
-      </div>
+            <div class="savings-highlight">
+              <span class="savings-icon">💰</span> Potential Savings: <strong>$1 Billion/month</strong>
+            </div>
 
         <script>
           const pieCtx = document.getElementById('pie-chart-div').getContext('2d');
@@ -142,14 +192,28 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
           const lineCtx = document.getElementById('line-chart-div').getContext('2d');
           const additionalCtx = document.getElementById('additional-chart-div').getContext('2d');
 
+          const colors = [
+            'rgba(255, 99, 132, 0.5)',
+            'rgba(54, 162, 235, 0.5)',
+            'rgba(255, 206, 86, 0.5)',
+            'rgba(75, 192, 192, 0.5)',
+            'rgba(153, 102, 255, 0.5)',
+            'rgba(255, 159, 64, 0.5)',
+            'rgba(100, 200, 100, 0.5)',
+            'rgba(200, 100, 200, 0.5)',
+          ];
+
+          const borderColor = colors.map(color => color.replace('0.5', '1'));
+
+
           new Chart(pieCtx, {
-            type: 'pie',
+            type: 'bar',
             data: {
               labels: ${JSON.stringify(data?.labels)},
               datasets: [{
                 data: ${JSON.stringify(data?.values)},
-                backgroundColor: ['rgba(255, 99, 132, 0.5)', 'rgba(75, 192, 192, 0.5)', 'rgba(255, 205, 86, 0.5)'],
-                borderColor: ['rgba(255, 99, 132, 1)', 'rgba(75, 192, 192, 1)', 'rgba(255, 205, 86, 1)'],
+                backgroundColor: colors,
+                borderColor: borderColor,
                 borderWidth: 1
               }]
             }
@@ -162,8 +226,8 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
               datasets: [{
                 label: '# of Instances',
                 data: ${JSON.stringify(data?.values)},
-                backgroundColor: ['rgba(255, 99, 132, 0.5)', 'rgba(75, 192, 192, 0.5)', 'rgba(255, 205, 86, 0.5)'],
-                borderColor: ['rgba(255, 99, 132, 1)', 'rgba(75, 192, 192, 1)', 'rgba(255, 205, 86, 1)'],
+                backgroundColor: colors,
+                borderColor: borderColor,
                 borderWidth: 1
               }]
             }
@@ -177,13 +241,13 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
                 label: 'Tendência de Uso',
                 data: ${JSON.stringify(data?.values)},
                 borderColor: 'rgba(75, 192, 192, 1)',
-                fill: false
+                fill: true,
               }]
             }
           });
 
           new Chart(additionalCtx, {
-            type: 'doughnut',
+            type: 'radar',
             data: {
               labels: ${JSON.stringify(data?.labels)},
               datasets: [{
@@ -205,7 +269,7 @@ async function generateReport(data: { labels: any; values: any } | undefined) {
 
   const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
   const page = await browser.newPage();
-  await page.setViewport({ width: 1200, height: 800 });
+  await page.setViewport({ width: 1250, height: 1850 });
 
   await page.goto(`file://${filePath}`, { waitUntil: "networkidle0" });
 
@@ -243,17 +307,10 @@ function calculateSavings(
 
 (async () => {
   ensureFincostsFileExists();
-  const provider = argv.provider || (await getProvider());
+  const provider = argv.provider;
   const profile = argv.profile;
 
-  const resourceCosts: any = {
-    AWS: {
-      EC2: { unusedInstance: 30 },
-      EBS: { unusedVolume: 10 },
-    },
-  };
-
-  profile != null && setAWSCredentials(profile);
+  if (profile) setAWSCredentials(profile);
 
   if (!Object.values(AvailableProviders).includes(provider)) {
     console.log("\n😞 Sorry, we currently do not support this provider");
@@ -267,44 +324,29 @@ function calculateSavings(
     let analysisData: any;
     switch (provider) {
       case AvailableProviders.AWS:
-        analysisData = await performAWSAnalysis();
-        profile != null ? await performAWSAnalysis(false) : await performAWSAnalysis(true);
+        profile != null ? (analysisData = await performAWSAnalysis(false)) : (analysisData = await performAWSAnalysis(true));
         break;
-      // case AvailableProviders.GCP:
-      //   await performGCPAnalysis();
-      //   break;
-      // case AvailableProviders.Azure:
-      //   await performAzureAnalysis();
-      //   break;
+      case AvailableProviders.GCP:
+        break;
+      case AvailableProviders.Azure:
+        await performAzureAnalysis();
+        break;
       default:
         throw new Error("Unsupported provider");
     }
 
-    if (analysisData) {
-      const savings = calculateSavings(analysisData, resourceCosts[provider]);
-      console.log(`💰 Potential savings: $${savings}/month`);
-    }
-
-    const downloadReport: boolean = argv["generate-report"] || argv["no-report"] || (await getDownloadReportPreference());
+    const downloadReport: boolean = argv["generate-report"] ? await getDownloadReportPreference() : true;
 
     if (argv["no-report"] || !downloadReport) {
       return;
     }
 
-    if (downloadReport && !argv["no-report"]) {
-      const analysisData = {
-        labels: [
-          "Low Usage EC2",
-          "Old EBS Snapshots",
-          "Unattached EBS Volumes",
-          "Unattached EIP",
-          "Unattached ENI",
-          "Unused Load Balancers",
-          "Unused NAT Gateways",
-        ],
+    if (downloadReport) {
+      const reportData = {
+        labels: ["EC2 Instances", "EBS Snapshots", "EBS Volumes", "EIP", "ENI", "Load Balancers", "NAT Gateways"],
         values: [10, 15, 8, 5, 7, 2, 3],
       };
-      await generateReport(analysisData);
+      await generateReport(reportData);
     }
   } catch (error: any) {
     console.log(chalk.red("\n✖", error.message));
